@@ -6,17 +6,17 @@ from typing import Iterable
 
 import numpy as np
 import pandas as pd
+import folium
 
+ 
 EARTH_RADIUS_KM = 6371.0088
-CSV_PATH = Path("Raw Data") / "Device_AB00035.csv"
-TARGET_MMSI = 416426000
+CSV_PATH = Path(r"C:\Users\slab\Desktop") / "Slab Project" / "Stage1" / "data" / "Device_AB00035.csv"
 FIRST_STAGE_EPS = 0.01  # radians; ~63 km
 FIRST_STAGE_MIN_SAMPLES = 10
 SECOND_STAGE_EPS_KM = 1.0  # merge harbour centers within 1 km
 
 # haversine to radius km
 def _haversine_km(latitudes: Iterable[float], longitudes: Iterable[float], center_lat: float, center_lon: float) -> np.ndarray:
-    """Vectorised haversine distance from points to a single center in kilometres."""
     latitudes = np.asarray(latitudes, dtype=float)
     longitudes = np.asarray(longitudes, dtype=float)
 
@@ -37,7 +37,6 @@ def _haversine_km(latitudes: Iterable[float], longitudes: Iterable[float], cente
 
 # haversine to radius radians
 def _haversine_rad_vector(points_rad: np.ndarray, center_rad: np.ndarray) -> np.ndarray:
-    """Great-circle distance from multiple points to a single center, expressed in radians."""
     delta_lat = points_rad[:, 0] - center_rad[0]
     delta_lon = points_rad[:, 1] - center_rad[1]
 
@@ -49,7 +48,6 @@ def _haversine_rad_vector(points_rad: np.ndarray, center_rad: np.ndarray) -> np.
 
 # DBSCAN 
 def _dbscan_haversine(coords_rad: np.ndarray, eps: float, min_samples: int) -> np.ndarray:
-    """Lightweight DBSCAN implementation tailored for haversine distances."""
     n_samples = len(coords_rad)
     if n_samples == 0:
         return np.empty((0,), dtype=int)
@@ -111,10 +109,8 @@ def _dbscan_haversine(coords_rad: np.ndarray, eps: float, min_samples: int) -> n
     return labels
 
 # Data Preprocessing and Filtering
-def load_and_preprocess(csv_path: Path = CSV_PATH, target_mmsi: int = TARGET_MMSI) -> pd.DataFrame:
-    """Load the raw AIS data and apply the filters specified in the spec."""
-    df = pd.read_csv(csv_path, low_memory=False)
-    df = df[df["MMSI"] == target_mmsi].copy()
+def load_and_preprocess(csv_path: Path = CSV_PATH) -> pd.DataFrame:
+    df = pd.read_csv(csv_path, low_memory=False).copy()
 
     df["Lat"] = pd.to_numeric(df["Lat"], errors="coerce")
     df["Long"] = pd.to_numeric(df["Long"], errors="coerce")
@@ -130,9 +126,7 @@ def load_and_preprocess(csv_path: Path = CSV_PATH, target_mmsi: int = TARGET_MMS
     slow_df = df[df["Sog"] < 0.2].copy()
     return slow_df.reset_index(drop=True)
 
-
 def _first_stage_clusters(slow_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Run the first DBSCAN over low-speed points and return cluster summaries and memberships."""
     if slow_df.empty:
         empty_cols = ["cluster_id", "center_lat", "center_lon", "radius_km"]
         return pd.DataFrame(columns=empty_cols), slow_df.assign(cluster_id=pd.Series(dtype=int))
@@ -164,11 +158,9 @@ def _first_stage_clusters(slow_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataF
     summary_df = pd.DataFrame(summaries)
     return summary_df, member_df
 
-
 def _merge_clusters(summary_df: pd.DataFrame, member_df: pd.DataFrame) -> pd.DataFrame:
-    """Merge nearby harbour clusters using a secondary DBSCAN over the centroids."""
     if summary_df.empty:
-        return pd.DataFrame(columns=["port_id", "center_lat", "center_lon", "radius_km"])
+        return pd.DataFrame(columns=["port_id", "center_lat", "center_lon", "radius_km", "num_points"])
 
     centers_rad = np.radians(summary_df[["center_lat", "center_lon"]].to_numpy())
     eps_rad = SECOND_STAGE_EPS_KM / EARTH_RADIUS_KM
@@ -181,6 +173,7 @@ def _merge_clusters(summary_df: pd.DataFrame, member_df: pd.DataFrame) -> pd.Dat
     for port_index, (merge_id, subset) in enumerate(summary_df.groupby("merge_id")):
         member_ids = subset["cluster_id"].tolist()
         merged_points = member_df[member_df["cluster_id"].isin(member_ids)]
+
         center_lat = merged_points["Lat"].mean()
         center_lon = merged_points["Long"].mean()
         distances = _haversine_km(merged_points["Lat"].to_numpy(), merged_points["Long"].to_numpy(), center_lat, center_lon)
@@ -191,22 +184,52 @@ def _merge_clusters(summary_df: pd.DataFrame, member_df: pd.DataFrame) -> pd.Dat
             "center_lat": center_lat,
             "center_lon": center_lon,
             "radius_km": radius_km,
+            "num_points": len(merged_points)   # 點數
         })
 
     merged_df = pd.DataFrame(merged_ports)
     return merged_df.sort_values("port_id").reset_index(drop=True)
 
-
-def detect_ports(csv_path: Path = CSV_PATH, target_mmsi: int = TARGET_MMSI) -> pd.DataFrame:
-    """High-level helper that runs the entire harbour-detection pipeline."""
-    slow_df = load_and_preprocess(csv_path, target_mmsi)
+def detect_ports(csv_path: Path = CSV_PATH) -> pd.DataFrame:
+    slow_df = load_and_preprocess(csv_path)
     summary_df, member_df = _first_stage_clusters(slow_df)
     return _merge_clusters(summary_df, member_df)
 
+def visualize_ports(ports: pd.DataFrame, map_filename: str = "ports_map.html"):
+    if ports.empty:
+        print("No ports to visualize.")
+        return None
+
+    center_lat = ports["center_lat"].mean()
+    center_lon = ports["center_lon"].mean()
+    m = folium.Map(location=[center_lat, center_lon], zoom_start=5, tiles="OpenStreetMap")
+
+    for _, row in ports.iterrows():
+        folium.Circle(
+            location=[row["center_lat"], row["center_lon"]],
+            radius=row["radius_km"] * 1000,
+            color="blue",
+            fill=True,
+            fill_opacity=0.2,
+            popup=(f"Port {row['port_id']}<br>"
+                   f"Radius: {row['radius_km']:.2f} km<br>"
+                   f"Points: {row['num_points']}")
+        ).add_to(m)
+        folium.Marker(
+            location=[row["center_lat"], row["center_lon"]],
+            icon=folium.Icon(color="red", icon="anchor", prefix="fa"),
+            popup=f"Port {row['port_id']}"
+        ).add_to(m)
+
+    m.save(map_filename)
+    print(f"Map saved to {map_filename}")
+    return m
 
 if __name__ == "__main__":
     ports = detect_ports()
     if ports.empty:
         print("No ports detected with the current parameters.")
     else:
+        print("Detected Ports:")
         print(ports.to_string(index=False))
+        visualize_ports(ports)
