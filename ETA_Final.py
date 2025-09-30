@@ -352,14 +352,14 @@ plt.show()
 
 # 預測ETA 在這裡改就好
 #------------------------------
-prelon = 129.8246
-prelat = 30.364964
-presog = 10.208171629256311
+prelon = 121.377811
+prelat = 25.154453
+presog = 11.8
 #------------------------------
 lat1 = radians(prelat)
 lon1 = radians(prelon)
-lat2 = radians(25.154453)
-lon2 = radians(121.377811)
+lat2 = radians(25.1384)
+lon2 = radians(121.7476)
 
 # 哈弗辛公式
 dlat = lat2 - lat1
@@ -374,7 +374,7 @@ R = 6371.0
 distance = R * c
 print(f"剩餘距離：{distance:.2f} 公里")
 
-# 假設這是從 API 獲取的即時船舶資料
+# 即時船舶資料
 new_data = {
     'Lat': prelat,
     'Lng_360': prelon,
