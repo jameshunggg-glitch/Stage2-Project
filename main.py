@@ -1,25 +1,25 @@
 """
 main.py
 -------
-專案主程式，串接 data_loader 與 voyage_splitter
+專案主程式，串接 data_loader、voyage_splitter、od_marker、visualization
 """
 
 from pathlib import Path
 import webbrowser
-import pandas as pd
 
 # 匯入自訂模組
 from data_loader import load_and_preprocess
 from voyage_splitter import detect_stops, split_voyages, voyage_quality_checker
-from visualization import visualize_voyages 
+from visualization import visualize_voyages
+from od_marker import assign_ports
 
 
 def main():
     # -----------------------------------
     # Step 1: 載入與前處理
     # -----------------------------------
-    csv_path = Path(r"C:\Users\slab\Desktop\Slab Project\Stage1\data\Device_AB00035.csv")
-    target_mmsi = 416426000
+    csv_path = Path(r"C:\Users\slab\Desktop") / "Slab Project" / "Stage1" / "data" / "370886000.csv"
+    target_mmsi = 370886000
 
     print("載入與前處理資料中...")
     df = load_and_preprocess(csv_path, target_mmsi)
@@ -47,23 +47,33 @@ def main():
     print(f"QA 完成，有效航程數量: {voyages_qc['valid_flag'].sum()}")
 
     # -----------------------------------
-    # Step 5: 合併 QA 結果
+    # Step 5: 合併 QA 結果 + 航程索引
     # -----------------------------------
-    voyages = voyages.merge(voyages_qc, on="voyage_id", how="left")
+    voyages_merged = voyages.merge(voyages_qc, on="voyage_id", how="left")
 
-    # 畫圖
-    visualize_voyages(df_with_voyages, voyages, "voyages_map.html")
-    import webbrowser
+    # -----------------------------------
+    # Step 6: 標註起訖點 & 港口
+    # -----------------------------------
+    ports_csv = Path(r"C:\Users\slab\Desktop\Slab Project\Stage1\data\filtered_ports.csv")
+    print("標註起訖港口...")
+    voyages_with_ports = assign_ports(
+        voyages_merged, df_with_voyages, ports_csv, debug=True
+    )
+
+    # -----------------------------------
+    # Step 7: 畫圖
+    # -----------------------------------
+    visualize_voyages(df_with_voyages, voyages_with_ports, "voyages_map.html")
     webbrowser.open("voyages_map.html")
 
     # -----------------------------------
-    # Step 6: 輸出結果
+    # Step 8: 輸出結果
     # -----------------------------------
     output_path = Path("output_voyages.csv")
-    voyages.to_csv(output_path, index=False)
+    voyages_with_ports.to_csv(output_path, index=False, encoding="utf-8-sig")
     print(f"航程摘要輸出完成: {output_path.resolve()}")
 
-    return df_with_voyages, voyages
+    return df_with_voyages, voyages_with_ports
 
 
 if __name__ == "__main__":

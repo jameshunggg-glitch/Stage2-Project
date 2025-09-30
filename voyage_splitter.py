@@ -10,6 +10,14 @@ from haversine import haversine
 from shapely.geometry import LineString
 from sklearn.cluster import DBSCAN
 
+# ---------- 小工具：確保丟進 haversine 的是 [-180,180] 經度 ----------
+def _to_lon180(lon):
+    return ((lon + 180) % 360) - 180
+
+def _safe_haversine(c1, c2):
+    """c1,c2 = (lat, lon) ; lon 允許是任意範圍，會自動轉為 [-180,180] 再算距離（km）"""
+    return haversine((c1[0], _to_lon180(c1[1])), (c2[0], _to_lon180(c2[1])))
+
 # -----------------------------------
 # 停泊判斷
 # -----------------------------------
@@ -17,16 +25,8 @@ def detect_stops(df, sog_threshold=0.5, max_gap_sec=120,
                  min_stop_sec=1800, max_stop_radius=0.3):
     """
     停泊判斷：根據 SOG 與空間半徑過濾
-
-    參數:
-        df (pd.DataFrame): AIS 資料，需含 Lat, Long_360, Sog, Timestamp
-        sog_threshold (float): 判斷為停泊的速度閾值
-        max_gap_sec (int): 停泊內可容忍的最大空檔
-        min_stop_sec (int): 最小停泊時間（秒）
-        max_stop_radius (float): 停泊區段內的最大半徑（km）
-
-    回傳:
-        list: 停泊區段 (每段是一個 index range)
+    需要欄位：Lat, Long, Long_360, Sog, Timestamp
+    回傳：停泊區段 (list of range)
     """
     df = df.copy()
     df['Is_Stop'] = df['Sog'] < sog_threshold
@@ -52,7 +52,7 @@ def detect_stops(df, sog_threshold=0.5, max_gap_sec=120,
         seg = range(current_start_idx, last_stop_idx + 1)
         stop_segments.append(seg)
 
-    # 過濾短停泊 + 空間半徑檢查
+    # 過濾短停泊 + 空間半徑檢查（距離用 Long [-180,180]）
     filtered_segments = []
     for seg in stop_segments:
         start_time = df.loc[seg[0], 'Timestamp']
@@ -60,10 +60,16 @@ def detect_stops(df, sog_threshold=0.5, max_gap_sec=120,
         duration = (end_time - start_time).total_seconds()
 
         lat_mean = df.loc[seg, 'Lat'].median()
-        lon_mean = df.loc[seg, 'Long_360'].median()
-        distances = [haversine((lat_mean, lon_mean),
-                               (df.loc[j, 'Lat'], df.loc[j, 'Long_360']))
-                     for j in seg]
+        # 半徑判斷請用 Long（不是 Long_360）
+        lon_mean = df.loc[seg, 'Long'].median()
+
+        distances = [
+            _safe_haversine(
+                (lat_mean, lon_mean),
+                (df.loc[j, 'Lat'], df.loc[j, 'Long'])
+            )
+            for j in seg
+        ]
         r95 = np.percentile(distances, 95)
 
         if duration >= min_stop_sec and r95 <= max_stop_radius:
@@ -80,8 +86,8 @@ def split_voyages(df, stop_segments):
     根據停泊段切分航程，並計算 Real_ETA_sec
 
     回傳:
-        df (pd.DataFrame): 加上 voyage_id 與 Real_ETA_sec 的 DataFrame
-        voyages (pd.DataFrame): 每條航程的摘要資訊
+        df (pd.DataFrame): 加上 voyage_id 與 Real_ETA_sec
+        voyages (pd.DataFrame): 航程摘要
     """
     df = df.copy()
     df['voyage_id'] = np.nan
@@ -96,10 +102,8 @@ def split_voyages(df, stop_segments):
         if start_idx > end_idx:
             continue
 
-        # 標記 voyage_id
         df.loc[start_idx:end_idx, 'voyage_id'] = voyage_id
 
-        # ETA = 下一停泊起始時間 - 當前時間
         eta_time = df.loc[stop_segments[i + 1], 'Timestamp'].min()
         df.loc[start_idx:end_idx, 'Real_ETA_sec'] = (
             (eta_time - df.loc[start_idx:end_idx, 'Timestamp']).dt.total_seconds()
@@ -112,7 +116,6 @@ def split_voyages(df, stop_segments):
             "dep_time": df.loc[start_idx, 'Timestamp'],
             "arr_time": df.loc[end_idx, 'Timestamp']
         })
-
         voyage_id += 1
 
     return df, pd.DataFrame(voyages)
@@ -123,15 +126,17 @@ def split_voyages(df, stop_segments):
 # -----------------------------------
 def check_large_time_gaps(seg, gap_threshold_hr=2.0):
     """檢查航程中是否有連續兩點時間間隔 > gap_threshold_hr (小時)"""
+    if len(seg) <= 1:
+        return False
     time_diffs = seg["Timestamp"].diff().dt.total_seconds().dropna()
     return (time_diffs > gap_threshold_hr * 3600).any()
 
 
 # def check_cross_land(seg, land_gdf):
-#     """檢查航程是否穿越陸地"""
 #     if len(seg) < 2:
 #         return False
-#     coords = list(zip(seg["Long_360"], seg["Lat"]))  # shapely 要 (lon, lat)
+#     # shapely 要 (lon, lat)；若啟用，建議也改成使用 Long（不是 Long_360）
+#     coords = list(zip(seg["Long"], seg["Lat"]))
 #     line = LineString(coords)
 #     return land_gdf.intersects(line).any()
 
@@ -140,35 +145,40 @@ def check_large_time_gaps(seg, gap_threshold_hr=2.0):
 # 航程 QA 檢查器（含 R0–R6）
 # -----------------------------------
 def voyage_quality_checker(
-    df, voyages, 
+    df, voyages,
     min_duration_sec=1800, min_distance_km=2.0,
     hdg_spin_threshold_deg=360, disp_threshold_km=2.0,
     cluster_eps_km=1.0, min_stop_for_cluster=3,
     gap_threshold_hr=2.0, land_gdf=None
 ):
     """
-    對航程進行 QA 檢查，包含 R0–R6 規則
+    對航程進行 QA 檢查（R0–R6）
+    - 所有距離計算改用 Long（-180~180），避免 haversine 報錯
+    - 停泊聚類(DBSCAN)用 Lat/Long 轉 radians
     """
     results = []
 
-    # Step 1: 停泊 cluster
+    # Step 1: 停泊 cluster（用 Long 而非 Long_360）
     stop_centers = []
-    if "voyage_id" in df:
-        stops = df[df["voyage_id"].isna()]
+    if "voyage_id" in df.columns:
+        stops = df[df["voyage_id"].isna()].copy()
         if not stops.empty:
-            coords = np.radians(stops[["Lat", "Long_360"]].to_numpy())
+            coords = np.radians(stops[["Lat", "Long"]].to_numpy())  # <- 關鍵：用 Long
             kms_per_radian = 6371.0088
-            db = DBSCAN(eps=cluster_eps_km/kms_per_radian,
-                        min_samples=min_stop_for_cluster,
-                        metric="haversine")
+            db = DBSCAN(
+                eps=cluster_eps_km / kms_per_radian,
+                min_samples=min_stop_for_cluster,
+                metric="haversine"
+            )
             labels = db.fit_predict(coords)
             stops["cluster_id"] = labels
             for cid, grp in stops.groupby("cluster_id"):
-                if cid == -1: continue
+                if cid == -1:
+                    continue
                 stop_centers.append({
                     "cluster_id": cid,
                     "lat": grp["Lat"].median(),
-                    "lon": grp["Long_360"].median()
+                    "lon": grp["Long"].median()
                 })
 
     # Step 2: 航程檢查
@@ -178,34 +188,43 @@ def voyage_quality_checker(
             continue
 
         duration = (seg["Timestamp"].iloc[-1] - seg["Timestamp"].iloc[0]).total_seconds()
-        displacement = haversine(
-            (seg["Lat"].iloc[0], seg["Long_360"].iloc[0]),
-            (seg["Lat"].iloc[-1], seg["Long_360"].iloc[-1])
-        )
-        path_len = np.sum([
-            haversine((seg["Lat"].iloc[i], seg["Long_360"].iloc[i]),
-                      (seg["Lat"].iloc[i+1], seg["Long_360"].iloc[i+1]))
-            for i in range(len(seg)-1)
-        ])
 
-        # HDG 累積旋轉量
-        hdg = seg["Hdg"].replace(511, np.nan).dropna().to_numpy()
-        heading_cum = 0
-        if len(hdg) > 1:
-            diffs = np.diff(hdg)
-            diffs = np.where(diffs > 180, diffs-360, diffs)
-            diffs = np.where(diffs < -180, diffs+360, diffs)
-            heading_cum = np.sum(np.abs(diffs))
+        # 位移與路徑長度：全部用 Long
+        displacement = _safe_haversine(
+            (seg["Lat"].iloc[0], seg["Long"].iloc[0]),
+            (seg["Lat"].iloc[-1], seg["Long"].iloc[-1])
+        )
+        if len(seg) > 1:
+            path_len = np.sum([
+                _safe_haversine(
+                    (seg["Lat"].iloc[i],   seg["Long"].iloc[i]),
+                    (seg["Lat"].iloc[i+1], seg["Long"].iloc[i+1])
+                )
+                for i in range(len(seg)-1)
+            ])
+        else:
+            path_len = 0.0
+
+        # HDG 累積旋轉量（Hdg 可能缺或有 511）
+        hdg_series = seg.get("Hdg")
+        heading_cum = 0.0
+        if hdg_series is not None and not hdg_series.isna().all():
+            hdg = hdg_series.replace(511, np.nan).dropna().to_numpy()
+            if len(hdg) > 1:
+                diffs = np.diff(hdg)
+                diffs = np.where(diffs > 180, diffs - 360, diffs)
+                diffs = np.where(diffs < -180, diffs + 360, diffs)
+                heading_cum = float(np.sum(np.abs(diffs)))
 
         # 規則檢查
         invalid_reason = None
 
-        # R0/R1 起訖 cluster
+        # R0/R1 起訖 cluster（用 Long）
         if stop_centers:
-            start = (seg["Lat"].iloc[0], seg["Long_360"].iloc[0])
-            end   = (seg["Lat"].iloc[-1], seg["Long_360"].iloc[-1])
-            dists_start = [haversine(start, (c["lat"], c["lon"])) for c in stop_centers]
-            dists_end   = [haversine(end,   (c["lat"], c["lon"])) for c in stop_centers]
+            start = (seg["Lat"].iloc[0], seg["Long"].iloc[0])
+            end   = (seg["Lat"].iloc[-1], seg["Long"].iloc[-1])
+            dists_start = [_safe_haversine(start, (c["lat"], c["lon"])) for c in stop_centers]
+            dists_end   = [_safe_haversine(end,   (c["lat"], c["lon"])) for c in stop_centers]
             c_start, c_end = np.argmin(dists_start), np.argmin(dists_end)
 
             if c_start == c_end:
@@ -231,16 +250,15 @@ def voyage_quality_checker(
             if check_large_time_gaps(seg, gap_threshold_hr):
                 invalid_reason = "R5_large_time_gap"
 
-        # R6 陸地相交 (暫時註解掉)
+        # R6 陸地相交（若啟用，建議一律用 Long）
         # if invalid_reason is None and land_gdf is not None:
         #     if check_cross_land(seg, land_gdf):
         #         invalid_reason = "R6_cross_land"
 
         valid = invalid_reason is None
-        
         results.append({
             "voyage_id": v["voyage_id"],
-            "duration_hr": duration/3600,
+            "duration_hr": duration / 3600,
             "displacement_km": displacement,
             "path_len_km": path_len,
             "HeadingCum_deg": heading_cum,
@@ -252,6 +270,5 @@ def voyage_quality_checker(
     return pd.DataFrame(results)
 
 
-# 測試用：直接執行時
 if __name__ == "__main__":
     print("這是 voyage_splitter 模組，請在 main.py 中 import 使用。")
