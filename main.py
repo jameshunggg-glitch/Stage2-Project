@@ -18,8 +18,8 @@ def main():
     # -----------------------------------
     # Step 1: 載入與前處理
     # -----------------------------------
-    csv_path = Path(r"C:\Users\slab\Desktop") / "Slab Project" / "Stage1" / "data" / "370886000.csv"
-    target_mmsi = 370886000
+    csv_path = Path(r"C:\Users\slab\Desktop") / "Slab Project" / "Stage1" / "data" / "416044000.csv"
+    target_mmsi = 416044000
 
     print("載入與前處理資料中...")
     df = load_and_preprocess(csv_path, target_mmsi)
