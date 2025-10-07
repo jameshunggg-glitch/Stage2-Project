@@ -124,12 +124,69 @@ def split_voyages(df, stop_segments):
 # -----------------------------------
 # QA 輔助函式
 # -----------------------------------
-def check_large_time_gaps(seg, gap_threshold_hr=2.0):
-    """檢查航程中是否有連續兩點時間間隔 > gap_threshold_hr (小時)"""
+def check_missing_time_gaps(seg, bins=(0.5, 1.5, 3.0)):
+    """
+    掃描單一航程，找出所有時間缺口（gap）。
+    - small_time_gap: 0.5h ~ 1.5h
+    - mid_time_gap: 1.5h ~ 3h
+    - large_time_gap: >3h
+
+    回傳：
+        dict:
+            {
+                "has_gap": bool,
+                "gaps": [  # 每個缺口的詳細資料
+                    {
+                        "gap_type": str,
+                        "gap_hr": float,
+                        "A_idx": int, "B_idx": int,
+                        "A": {"lat": float, "lon": float, "t": Timestamp},
+                        "B": {"lat": float, "lon": float, "t": Timestamp}
+                    }, ...
+                ]
+            }
+    """
     if len(seg) <= 1:
-        return False
+        return {"has_gap": False, "gaps": []}
+
     time_diffs = seg["Timestamp"].diff().dt.total_seconds().dropna()
-    return (time_diffs > gap_threshold_hr * 3600).any()
+    if time_diffs.empty:
+        return {"has_gap": False, "gaps": []}
+
+    gap_list = []
+    for i, gap_sec in enumerate(time_diffs):
+        gap_hr = gap_sec / 3600
+        if gap_hr < 0.5:
+            continue  # 小於30分鐘不算
+        elif bins[0] <= gap_hr < bins[1]:
+            gap_type = "small_time_gap"
+        elif bins[1] <= gap_hr < bins[2]:
+            gap_type = "mid_time_gap"
+        else:
+            gap_type = "large_time_gap"
+
+        gap_list.append({
+            "gap_type": gap_type,
+            "gap_hr": gap_hr,
+            "A_idx": seg.index[i],
+            "B_idx": seg.index[i + 1],
+            "A": {
+                "lat": seg["Lat"].iloc[i],
+                "lon": seg["Long"].iloc[i],
+                "t": seg["Timestamp"].iloc[i]
+            },
+            "B": {
+                "lat": seg["Lat"].iloc[i + 1],
+                "lon": seg["Long"].iloc[i + 1],
+                "t": seg["Timestamp"].iloc[i + 1]
+            }
+        })
+
+    return {
+        "has_gap": len(gap_list) > 0,
+        "gaps": gap_list
+    }
+
 
 
 # def check_cross_land(seg, land_gdf):
@@ -246,9 +303,11 @@ def voyage_quality_checker(
                 invalid_reason = "R4b_excessive_turns"
 
         # R5 大時間間隔
-        if invalid_reason is None:
-            if check_large_time_gaps(seg, gap_threshold_hr):
-                invalid_reason = "R5_large_time_gap"
+        # R5 缺口檢查（存在任意缺口 → 需修復）
+        gap_info = check_missing_time_gaps(seg)
+        if invalid_reason is None and gap_info["has_gap"]:
+            invalid_reason = "R5_missing_time_gap"
+
 
         # R6 陸地相交（若啟用，建議一律用 Long）
         # if invalid_reason is None and land_gdf is not None:
@@ -256,6 +315,7 @@ def voyage_quality_checker(
         #         invalid_reason = "R6_cross_land"
 
         valid = invalid_reason is None
+        
         results.append({
             "voyage_id": v["voyage_id"],
             "duration_hr": duration / 3600,
@@ -264,7 +324,8 @@ def voyage_quality_checker(
             "HeadingCum_deg": heading_cum,
             "n_points": len(seg),
             "valid_flag": valid,
-            "invalid_reason": invalid_reason
+            "invalid_reason": invalid_reason,
+            "gap_list": gap_info["gaps"] if gap_info["has_gap"] else []
         })
 
     return pd.DataFrame(results)

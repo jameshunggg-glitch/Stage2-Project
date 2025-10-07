@@ -1,30 +1,13 @@
-# 實作流程markdown
+# 將航跡修復測試程式模組化
+- 我打算將recon_tra_mid_gap以及recon_tra_small_gap合併成Trajectory_Recon.py。
+- 參考main.py 的程式碼，這個合併的Trajectory_Recon.py應該是吃進voyage_merged裡面invalid_reason = R5_missing_time_gap 的航程。
+- 對整筆航程資料新增一個欄位"Reconstruction"。
+- 先偵測這個航程之中的需要修復的片段，注意每段航程可能會有不只一組訊號遺失。
+- 再航程修復之前先判斷該voyage裡面的time_gap是small_time_gap還是mid_time_gap還是large_time_gap，small_time_gap是連續兩個ais訊號之間間隔在30分鐘到1.5小時之間，mid_time_gap是連續兩個ais訊號之間間隔在1.5小時到4小時之間，large_time_gap則是連續兩個ais訊號之間間隔在4小時以上。
+- 對每個time_gap都記錄下他們的端點座標。
+- 修復samll_time_gap的時候請使用原本recon_tra_small_gap裡面的方法，利用需要修復的航程片段的兩邊端點座標[Lat, Long]來做修復
+- 對mid_time_gap還有large_time_gap，修復請使用recon_tra_mid_gap的方法，一樣是使用端點座標來做修復
+- 不管是修復哪一種time_gap，都將修復的點記錄下來並且填補至原航程內，例如A點->B點訊號遺失，修復完成後將修復的點重新填入A點與B點之中
+- 對於修復的航程點，在"Reconstruction"欄位中填上True，若是原本的訊號點則填上False
+- 請幫助我完成這整個Trajectory_Recon.py
 
-## 專案目標
-用 python 實作船舶資料的歷史航線比較
-
-# 功能需求如下
-# 讀取檔案
-- 利用pandas 讀取檔案
-- 檔案的路徑為 "C:\Users\slab\Desktop\Slab Project\Stage2 ETA\Raw Data\Device_AB00035.csv"
-
-# 資料前處裡
-- 對讀取的檔案篩選，只留下MMSI = 416426000的資料
-- 對Lat欄位還有Long欄位將他們資料型態轉成float 型態，並將缺失值欄位dropna
-- 只留下資料Lat欄位在範圍-90與90之間的資料
-- 只留下資料Long欄位在範圍-180與180之間的資料
-- 將資料的Timestamp欄位轉換成datetime型態，format = '%Y%m%d%H%M%S'
-
-# 港口判定
-- 資料先過濾出低速點，留下Sog < 0.5 的資料
-- 將Lat,Long轉乘numpy，然後再將它們換成弧度
-- 對資料的Lat, Long做DBSCAN聚類，metric = haversine，eps = 0.01, min_samples = 10
-- 對其中的每個cluster:
-    - 算質心作為港口中心點(centroid)
-    - 算每個點到質心的距離然後取95%分位數
-    - 半徑 = 95%分位數*1.2
-    - 得到港口清單: port_id, center_lat, center_lon, radius
-- 對所有cluster的港口中心再做一次DBSCAN，如果兩個cluster中心的距離小於1km，合併為同一個港口
-- 重新得到港口清單: port_id, center_lat, center_lon, radius
-
-# 這些程式碼幫我寫在 Optimal.py裡面
