@@ -48,7 +48,7 @@ def load_and_preprocess(csv_path: Path, target_mmsi: int) -> pd.DataFrame:
     elif "Lng" in df.columns:
         df = df.rename(columns={"Lng": "Long"})
     else:
-        print(f"❌ 找不到經度欄位，欄位清單: {list(df.columns)}")
+        print(f" 找不到經度欄位，欄位清單: {list(df.columns)}")
         raise ValueError("請確認經度欄位名稱 (必須是 Long 或 Lng)")
 
     # -----------------------------------
@@ -59,7 +59,7 @@ def load_and_preprocess(csv_path: Path, target_mmsi: int) -> pd.DataFrame:
     elif "DataSourceLastTime_UTC" in df.columns:
         df = df.rename(columns={"DataSourceLastTime_UTC": "Timestamp"})
     else:
-        print(f"❌ 找不到時間欄位，欄位清單: {list(df.columns)}")
+        print(f" 找不到時間欄位，欄位清單: {list(df.columns)}")
         raise ValueError("請確認時間欄位名稱 (必須是 Timestamp 或 DataSourceLastTime_UTC)")
 
     # ⚠️ 現在才用 MMSI 篩選

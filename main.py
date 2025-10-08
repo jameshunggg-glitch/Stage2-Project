@@ -12,7 +12,7 @@ from data_loader import load_and_preprocess
 from voyage_splitter import detect_stops, split_voyages, voyage_quality_checker
 from visualization import visualize_voyages
 from od_marker import assign_ports
-from Trajectory_Recon import TrajectoryReconstructor  # ✅ 新增這行
+from Trajectory_Recon import TrajectoryReconstructor  # 新增這行
 
 def main():
     # -----------------------------------
@@ -52,7 +52,7 @@ def main():
     voyages_merged = voyages.merge(voyages_qc, on="voyage_id", how="left")
 
     # -----------------------------------
-    # ✅ Step 5.5: 航跡修復（Trajectory Reconstruction）
+    # Step 5.5: 航跡修復（Trajectory Reconstruction）
     # -----------------------------------
     print("檢查並修復時間缺口 (R5_missing_time_gap)...")
 
@@ -68,7 +68,7 @@ def main():
     print("Gap Summary:")
     print(gap_summary.head())
 
-    # ✅ 建議：將結果存檔（可視化/分析用）
+    # 建議：將結果存檔（可視化/分析用）
     df_recon.to_csv("reconstructed_tracks.csv", index=False, encoding="utf-8-sig")
     gap_summary.to_csv("reconstruction_summary.csv", index=False, encoding="utf-8-sig")
 

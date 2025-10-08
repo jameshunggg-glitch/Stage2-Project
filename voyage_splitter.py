@@ -124,12 +124,12 @@ def split_voyages(df, stop_segments):
 # -----------------------------------
 # QA 輔助函式
 # -----------------------------------
-def check_missing_time_gaps(seg, bins=(0.5, 1.5, 3.0)):
+def check_missing_time_gaps(seg, bins=(0.5, 1.5, 4.0)):
     """
     掃描單一航程，找出所有時間缺口（gap）。
     - small_time_gap: 0.5h ~ 1.5h
     - mid_time_gap: 1.5h ~ 3h
-    - large_time_gap: >3h
+    - large_time_gap: >4h
 
     回傳：
         dict:

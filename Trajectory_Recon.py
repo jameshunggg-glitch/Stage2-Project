@@ -42,7 +42,7 @@ SMALL_GAP_PAD_DEG = 0.4
 SMALL_GAP_NEIGHBOR_HOPS: Tuple[int, ...] = (1, 2)
 SMALL_GAP_SMOOTH_WINDOW = 7
 SMALL_GAP_SMOOTH_POLY = 3
-SMALL_GAP_DP_EPS_KM = 2.0
+SMALL_GAP_DP_EPS_KM = 0.9
 
 MID_GAP_PAD_DEG = 0.8
 LARGE_GAP_PAD_DEG = 2.0
@@ -314,9 +314,9 @@ class TrajectoryReconstructor:
         return normalized
 
     def _classify_gap(self, gap_hours: float) -> str:
-        if gap_hours < 1.5:
+        if gap_hours < 1.5 and gap_hours >= 0.5:
             return "small_time_gap"
-        if gap_hours < 4.0:
+        if gap_hours < 4.0 and gap_hours >= 1.5:
             return "mid_time_gap"
         return "large_time_gap"
 
