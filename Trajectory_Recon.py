@@ -37,7 +37,7 @@ DEFAULT_DENSITY_TIF = Path(
     r"C:\Users\slab\Desktop\Slab Project\Stage1\data\ShipDensity_Commercial\ShipDensity_Commercial1.tif"
 )
 
-SMALL_GAP_STEP_DEG = 0.02
+SMALL_GAP_STEP_DEG = 0.01
 SMALL_GAP_PAD_DEG = 0.4
 SMALL_GAP_NEIGHBOR_HOPS: Tuple[int, ...] = (1, 2)
 SMALL_GAP_SMOOTH_WINDOW = 7
@@ -343,8 +343,19 @@ class TrajectoryReconstructor:
         mmsi_value: Optional[int],
         gap_index: int,
     ) -> Optional[Dict[str, object]]:
+        
+        # ============ DEBUG 開始 ============
+        print("\n" + "="*60)
+        print(f"🔧 [DEBUG] 開始處理 voyage {voyage_id}, gap#{gap_index}")
+        print("="*60)
+        # ====================================
+        
+        
+        
         gap_type = gap.get("gap_type", "unknown")
         gap_hours = float(gap.get("gap_hr", float("nan")))
+
+        print(f"Gap 類型: {gap_type}, 時長: {gap_hours:.2f} 小時")
 
         A_info = gap.get("A", {})
         B_info = gap.get("B", {})
@@ -385,6 +396,13 @@ class TrajectoryReconstructor:
 
         if None in (start_lon, start_lat, end_lon, end_lat):
             return None
+        
+        print(f"📍 起點: ({start_lon:.6f}, {start_lat:.6f})")
+        print(f"📍 終點: ({end_lon:.6f}, {end_lat:.6f})")
+        print(f"📏 直線距離: {haversine(start_lon, start_lat, end_lon, end_lat):.2f} km")
+
+        # ============ 路徑搜尋 ============
+        print(f"\n🔍 開始路徑搜尋 (方法: {gap_type})...")
 
         if gap_type == "small_time_gap":
             route = self._small_gap_path(start_lon, start_lat, end_lon, end_lat)
@@ -394,7 +412,22 @@ class TrajectoryReconstructor:
         if not route or len(route) < 2:
             return None
 
+        print(f"✅ 路徑搜尋完成: {'成功' if route else '失敗'}")
+        if route:
+            print(f"📈 原始路徑點數: {len(route)}")
+            print(f"   前3點: {route[:3]}")
+            print(f"   後3點: {route[-3:]}")
+        if not route or len(route) < 2:
+            print(f"❌ 路徑點數不足 ({len(route) if route else 0} < 2)，放棄")
+            return None
+
+        # ============ 確保端點 ============
+
         route = self._ensure_endpoints(route, start_lon, start_lat, end_lon, end_lat)
+
+        print(f"🔧 確保端點後: {len(route)} 個點")
+
+        # ============ 時間分配 ============
         xs = [pt[0] for pt in route]
         ys = [pt[1] for pt in route]
         ts = _linear_time_expand(xs, ys, pd.Timestamp(start_time), pd.Timestamp(end_time))
@@ -418,7 +451,8 @@ class TrajectoryReconstructor:
             if mmsi_value is not None and "MMSI" in df.columns:
                 row["MMSI"] = int(mmsi_value)
             new_rows.append(row)
-
+        print(f"\n✨ 實際插入: {len(new_rows)} 個點")
+        print("="*60 + "\n")
         summary = GapResult(
             voyage_id=voyage_id,
             gap_index=gap_index,
@@ -457,6 +491,9 @@ class TrajectoryReconstructor:
         lon_b: float,
         lat_b: float,
     ) -> Optional[List[Tuple[float, float]]]:
+        
+        print(f"   [small_gap_path] 開始網格建圖...")
+
         land = self._load_land()
         sea_points, point_index, neighbor_steps = self._build_local_sea_graph(
             lon_a,
@@ -468,6 +505,7 @@ class TrajectoryReconstructor:
             hops=SMALL_GAP_NEIGHBOR_HOPS,
             pad_deg=SMALL_GAP_PAD_DEG,
         )
+        print(f"  🌊 海洋網格點數: {len(sea_points)}")
         xs, ys = self._astar_on_graph(
             sea_points,
             point_index,
@@ -476,9 +514,20 @@ class TrajectoryReconstructor:
             (lon_b, lat_b),
         )
         if xs is None or ys is None or len(xs) == 0:
+            print(f"   A* 搜尋失敗")
+            return None
+    
+        print(f"   A* 找到路徑: {len(xs)} 個節點")
+
+        print(f"[DEBUG] A* path nodes: {len(xs) if xs is not None else 0}")
+
+        if xs is None or ys is None or len(xs) == 0:
             return None
 
+        original_count = len(xs)
+
         xs, ys = self._dp_simplify(xs, ys, eps_km=SMALL_GAP_DP_EPS_KM)
+        print(f"   DP 簡化: {original_count} → {len(xs)} 個點 (eps={SMALL_GAP_DP_EPS_KM}km)")
         if savgol_filter is not None and len(xs) >= SMALL_GAP_SMOOTH_WINDOW:
             xs = savgol_filter(xs, SMALL_GAP_SMOOTH_WINDOW, SMALL_GAP_SMOOTH_POLY, mode="interp")
             ys = savgol_filter(ys, SMALL_GAP_SMOOTH_WINDOW, SMALL_GAP_SMOOTH_POLY, mode="interp")
@@ -607,20 +656,38 @@ class TrajectoryReconstructor:
         ys: Sequence[float],
         eps_km: float,
     ) -> Tuple[List[float], List[float]]:
+        
+        
         if len(xs) < 3:
             return list(xs), list(ys)
+        # 計算原始路徑的總長度和彎曲度
+        total_length = sum(haversine(xs[i-1], ys[i-1], xs[i], ys[i]) 
+                       for i in range(1, len(xs)))
+        direct_length = haversine(xs[0], ys[0], xs[-1], ys[-1])
+        tortuosity = total_length / (direct_length + 1e-6)
+    
+        print(f"  [DP] 輸入: {len(xs)} 個點")
+        print(f"  [DP] 路徑長度: {total_length:.2f} km (直線: {direct_length:.2f} km)")
+        print(f"  [DP] 曲折度: {tortuosity:.2f} (1.0=直線)")
         eps_deg = float(eps_km) / 111.0
+        print(f"  [DP] 簡化閾值: {eps_km} km = {eps_deg:.6f}°")
         line = LineString(zip(xs, ys))
         simplified = line.simplify(eps_deg, preserve_topology=False)
         sx, sy = zip(*simplified.coords)
         sx_list = list(sx)
         sy_list = list(sy)
+
+        # 確保端點
         if (sx_list[0], sy_list[0]) != (xs[0], ys[0]):
             sx_list.insert(0, xs[0])
             sy_list.insert(0, ys[0])
         if (sx_list[-1], sy_list[-1]) != (xs[-1], ys[-1]):
             sx_list.append(xs[-1])
             sy_list.append(ys[-1])
+        
+        reduction = (1 - len(sx_list) / len(xs)) * 100
+        print(f"  [DP] 輸出: {len(sx_list)} 個點 (減少 {reduction:.1f}%)")
+        
         return sx_list, sy_list
     # ------------------------------------------------------------------
     # Mid / large gap reconstruction (density map guided)
