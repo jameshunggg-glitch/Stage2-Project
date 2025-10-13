@@ -4,6 +4,8 @@ This module merges the small- and mid-gap prototypes into a reusable helper
 that can be imported from ``main.py``. It inspects voyage QA results and fills
 in gaps marked as ``R5_missing_time_gap`` using grid-based or density-guided
 routing, then injects interpolated points back into the voyage track.
+
+優化版本：使用區域陸地快取避免重複 union 計算
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 from shapely.geometry import LineString, Point
+from shapely.geometry.base import BaseGeometry
 
 try:  # Optional smoothing; module still works without SciPy.
     from scipy.signal import savgol_filter  # type: ignore
@@ -101,6 +104,16 @@ def _round_coord(value: float, ndigits: int = 6) -> float:
     return round(float(value), ndigits)
 
 
+def _bbox_key(minx: float, miny: float, maxx: float, maxy: float, precision: int = 1) -> Tuple[float, ...]:
+    """生成 bbox 的快取 key（四捨五入到指定精度）"""
+    return (
+        round(minx, precision),
+        round(miny, precision),
+        round(maxx, precision),
+        round(maxy, precision),
+    )
+
+
 @dataclass
 class GapResult:
     voyage_id: int
@@ -128,6 +141,11 @@ class TrajectoryReconstructor:
         self.land_shp_path = Path(land_shp_path) if land_shp_path else None
         self.density_tif_path = Path(density_tif_path) if density_tif_path else None
         self._land_gdf: Optional[gpd.GeoDataFrame] = None
+        
+        # === 新增：區域陸地快取 ===
+        self._region_land_cache: Dict[Tuple[float, ...], BaseGeometry] = {}
+        self._region_gdf_cache: Dict[Tuple[float, ...], gpd.GeoDataFrame] = {}
+        print("[快取] 初始化區域陸地快取系統")
 
     # ------------------------------------------------------------------
     # Public API
@@ -224,6 +242,10 @@ class TrajectoryReconstructor:
                         f"[ok] voyage {voyage_id} gap#{gap_index} ({result['summary']['gap_type']}) -> {inserted_pts} pts"
                     )
 
+        # === 顯示快取統計 ===
+        if verbose:
+            print(f"\n[快取統計] 區域陸地快取命中數: {len(self._region_land_cache)}")
+
         if inserted_rows:
             new_rows_df = pd.DataFrame(inserted_rows)
             for col in work_df.columns:
@@ -315,9 +337,9 @@ class TrajectoryReconstructor:
         return normalized
 
     def _classify_gap(self, gap_hours: float) -> str:
-        if gap_hours < 1.5 and gap_hours >= 0.5:
+        if gap_hours < 1.2 and gap_hours >= 0.5:
             return "small_time_gap"
-        if gap_hours < 4.0 and gap_hours >= 1.5:
+        if gap_hours < 4.0 and gap_hours >= 1.2:
             return "mid_time_gap"
         return "large_time_gap"
 
@@ -399,18 +421,13 @@ class TrajectoryReconstructor:
         direct_dist = haversine(start_lon, start_lat, end_lon, end_lat)
         print(f"📏 直線距離: {direct_dist:.2f} km")
 
-        # === 新增：靠岸跳過判定 ===
-        too_close_A = self._check_land_obstruction(
-            start_lon, start_lat, start_lon, start_lat, safe_distance_km=SAFE_DISTANCE_KM
-        )
-        too_close_B = self._check_land_obstruction(
-            end_lon, end_lat, end_lon, end_lat, safe_distance_km=SAFE_DISTANCE_KM
-        )
-        if too_close_A or too_close_B:
-            print(f"⚠️ 起點或終點距離陸地 < {SAFE_DISTANCE_KM} km，跳過修復")
+        # === 檢查起訖點是否太靠近陸地 ===
+        if self._is_near_land(start_lon, start_lat, safe_distance_km=SAFE_DISTANCE_KM):
+            print(f"⚠️ 起點距離陸地 < {SAFE_DISTANCE_KM} km，跳過修復")
             return None
-
-        print(f"\n🔍 開始路徑搜尋 (方法: {gap_type})...")
+        if self._is_near_land(end_lon, end_lat, safe_distance_km=SAFE_DISTANCE_KM):
+            print(f"⚠️ 終點距離陸地 < {SAFE_DISTANCE_KM} km，跳過修復")
+            return None
 
         print(f"\n🔍 開始路徑搜尋 (方法: {gap_type})...")
 
@@ -485,6 +502,54 @@ class TrajectoryReconstructor:
         return adjusted
 
     # ------------------------------------------------------------------
+    # 區域陸地快取系統
+    # ------------------------------------------------------------------
+
+    def _get_regional_land_union(
+        self,
+        minx: float,
+        miny: float,
+        maxx: float,
+        maxy: float,
+    ) -> Optional[BaseGeometry]:
+        """取得區域陸地的 union（帶快取）"""
+        cache_key = _bbox_key(minx, miny, maxx, maxy, precision=1)
+        
+        if cache_key in self._region_land_cache:
+            return self._region_land_cache[cache_key]
+        
+        land_gdf = self._load_land()
+        land_clip = land_gdf.cx[minx:maxx, miny:maxy]
+        
+        if land_clip.empty:
+            self._region_land_cache[cache_key] = None
+            return None
+        
+        union = land_clip.unary_union
+        self._region_land_cache[cache_key] = union
+        print(f"  [快取] 新增區域陸地 union: {cache_key}")
+        return union
+
+    def _get_regional_land_gdf(
+        self,
+        minx: float,
+        miny: float,
+        maxx: float,
+        maxy: float,
+    ) -> gpd.GeoDataFrame:
+        """取得區域陸地 GeoDataFrame（帶快取）"""
+        cache_key = _bbox_key(minx, miny, maxx, maxy, precision=1)
+        
+        if cache_key in self._region_gdf_cache:
+            return self._region_gdf_cache[cache_key]
+        
+        land_gdf = self._load_land()
+        land_clip = land_gdf.cx[minx:maxx, miny:maxy].copy()
+        
+        self._region_gdf_cache[cache_key] = land_clip
+        return land_clip
+
+    # ------------------------------------------------------------------
     # Small-gap reconstruction (grid-based A* with land checking)
     # ------------------------------------------------------------------
 
@@ -498,12 +563,6 @@ class TrajectoryReconstructor:
     ) -> Optional[List[Tuple[float, float]]]:
         
         direct_dist = haversine(lon_a, lat_a, lon_b, lat_b)
-
-                # === 新增：檢查起訖點是否太靠近陸地 ===
-        if self._is_near_land(lon_a, lat_a, safe_distance_km=SAFE_DISTANCE_KM) or \
-           self._is_near_land(lon_b, lat_b, safe_distance_km=SAFE_DISTANCE_KM):
-            print(f"  ⚠️ 起訖點靠近陸地，跳過此 gap 修復")
-            return None
 
         # === 步驟 1：檢查陸地阻擋 ===
         has_land = self._check_land_obstruction(
@@ -570,7 +629,6 @@ class TrajectoryReconstructor:
 
     def _calculate_target_points(self, distance_km: float, gap_hours: float) -> int:
         """計算目標點數：根據距離和時間"""
-        # small_time_gap 範圍：0.5~1.5 小時
         points_from_dist = int(distance_km / 2.0) + 2  # 每 2km 一個點
         points_from_time = int(gap_hours * 8) + 2      # 每小時 8 個點
         return max(5, points_from_dist, points_from_time)
@@ -581,22 +639,19 @@ class TrajectoryReconstructor:
         lat: float,
         safe_distance_km: float = SAFE_DISTANCE_KM,
     ) -> bool:
-        """檢查單一點是否太靠近陸地邊界（距離小於安全距離）"""
-
-        land_gdf = self._load_land()
-        point = Point(lon, lat)
-
-     # 只取局部區域
+        """檢查單一點是否太靠近陸地邊界（使用快取）"""
         pad = max(0.3, safe_distance_km / 50.0)
-        land_nearby = land_gdf.cx[
-            lon - pad : lon + pad,
-            lat - pad : lat + pad,
-        ]
-        if land_nearby.empty:
+        
+        # 使用快取的區域陸地 union
+        union_land = self._get_regional_land_union(
+            lon - pad, lat - pad,
+            lon + pad, lat + pad
+        )
+        
+        if union_land is None:
             return False
 
-    # 計算與最近陸地的距離（度轉 km）
-        union_land = land_nearby.unary_union
+        point = Point(lon, lat)
         dist_deg = point.distance(union_land)
         dist_km = dist_deg * 111  # 1 度 ≈ 111 km
         return dist_km < safe_distance_km
@@ -609,28 +664,26 @@ class TrajectoryReconstructor:
         lat_b: float,
         safe_distance_km: float = 1.0,
     ) -> bool:
-        """檢查直線路徑是否會穿越陸地（含安全距離）"""
-        land_gdf = self._load_land()
-        
-        # 建立直線
+        """檢查直線路徑是否會穿越陸地（使用快取）"""
         direct_line = LineString([(lon_a, lat_a), (lon_b, lat_b)])
         
-        # 只檢查路徑附近的陸地
         buffer = max(0.5, safe_distance_km / 50.0)
-        land_nearby = land_gdf.cx[
-            min(lon_a, lon_b) - buffer : max(lon_a, lon_b) + buffer,
-            min(lat_a, lat_b) - buffer : max(lat_a, lat_b) + buffer
-        ]
         
-        if land_nearby.empty:
+        # 使用快取的區域陸地 union
+        union_land = self._get_regional_land_union(
+            min(lon_a, lon_b) - buffer,
+            min(lat_a, lat_b) - buffer,
+            max(lon_a, lon_b) + buffer,
+            max(lat_a, lat_b) + buffer
+        )
+        
+        if union_land is None:
             return False
         
         # 加入安全距離緩衝
         buffer_deg = safe_distance_km / 111.0
         direct_line_buffered = direct_line.buffer(buffer_deg)
         
-        # 檢查相交
-        union_land = land_nearby.unary_union
         return direct_line_buffered.intersects(union_land)
 
     def _interpolate_along_path(
@@ -683,12 +736,14 @@ class TrajectoryReconstructor:
         grid_points = [Point(x, y) for x in xs for y in ys]
         gdf_points = gpd.GeoDataFrame(geometry=grid_points, crs="EPSG:4326")
 
-        land_clip = land_gdf.cx[minx:maxx, miny:maxy]
-        if land_clip.empty:
+        # 使用快取的區域陸地 union
+        union_land = self._get_regional_land_union(minx, miny, maxx, maxy)
+        
+        if union_land is None:
             sea_mask = np.ones(len(gdf_points), dtype=bool)
         else:
-            union = land_clip.unary_union
-            sea_mask = ~gdf_points.within(union)
+            sea_mask = ~gdf_points.within(union_land)
+        
         sea_points = gdf_points[sea_mask].copy()
         sea_points.reset_index(drop=True, inplace=True)
 
@@ -1140,5 +1195,7 @@ class TrajectoryReconstructor:
                 )
             if not self.land_shp_path.exists():
                 raise FileNotFoundError(f"Land shapefile not found: {self.land_shp_path}")
+            print("[快取] 首次載入陸地檔案...")
             self._land_gdf = gpd.read_file(self.land_shp_path).to_crs("EPSG:4326")
+            print(f"[快取] 陸地檔案載入完成: {len(self._land_gdf)} 個多邊形")
         return self._land_gdf

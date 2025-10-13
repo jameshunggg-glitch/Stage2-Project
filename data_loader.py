@@ -7,41 +7,53 @@ data_loader.py
 from pathlib import Path
 import pandas as pd
 import geopandas as gpd
+import numpy as np
 
-# 常數 (不用固定某個船隻或檔案)
+# 常數
 EARTH_RADIUS_KM = 6371.0088
 FIRST_STAGE_EPS = 0.01  # radians; ~63 km
 FIRST_STAGE_MIN_SAMPLES = 10
 SECOND_STAGE_EPS_KM = 1.0  # merge harbour centers within 1 km
 LAND_FILE = Path(r"C:\Users\slab\Desktop\Slab Project\Stage1\data\Land\ne_10m_land.shp")
-ports_csv = Path(r"C:\Users\slab\Desktop\Slab Project\Stage1\data\filtered_ports.csv")
+PORTS_CSV = Path(r"C:\Users\slab\Desktop\Slab Project\Stage1\data\filtered_ports.csv")
 
-# 載入陸地 shapefile（有需要的時候才用）
+# 載入陸地 shapefile（可延遲載入）
 land = gpd.read_file(LAND_FILE)
 
 
+# --------------------------------------------------------
+#  原始穩定版時間解析函式
+# --------------------------------------------------------
 def parse_timestamp(series: pd.Series) -> pd.Series:
     """
     嘗試解析時間欄位，支援:
     - AIS 格式: 20250711081924
     - ISO 格式: 2025-07-11T08:19:24
     """
-    # 先嘗試自動解析 (ISO 格式可直接處理)
-    ts = pd.to_datetime(series, errors="coerce")
+    # 先全部轉成字串，避免 int 被誤當成 epoch nanoseconds
+    series = series.astype(str).str.strip()
 
-    # 如果還有 NaT，嘗試 AIS 格式
-    if ts.isna().any():
-        ts2 = pd.to_datetime(series, format="%Y%m%d%H%M%S", errors="coerce")
-        ts = ts.fillna(ts2)
+    # 先試著用 AIS 格式 (14位數)
+    mask_ais = series.str.match(r"^\d{14}$")
+    ts = pd.to_datetime(series[mask_ais], format="%Y%m%d%H%M%S", errors="coerce")
+
+    # 其他格式再用一般解析
+    ts_other = pd.to_datetime(series[~mask_ais], errors="coerce")
+
+    # 合併結果
+    ts = pd.concat([ts, ts_other]).sort_index()
 
     return ts
 
 
+# --------------------------------------------------------
+#  主流程：載入與前處理
+# --------------------------------------------------------
 def load_and_preprocess(csv_path: Path, target_mmsi: int) -> pd.DataFrame:
     df = pd.read_csv(csv_path, low_memory=False)
 
     # -----------------------------------
-    # 防呆：處理經度欄位名稱 (Long 或 Lng)
+    # 經度欄位名稱處理
     # -----------------------------------
     if "Long" in df.columns:
         pass
@@ -52,7 +64,7 @@ def load_and_preprocess(csv_path: Path, target_mmsi: int) -> pd.DataFrame:
         raise ValueError("請確認經度欄位名稱 (必須是 Long 或 Lng)")
 
     # -----------------------------------
-    # 防呆：處理時間欄位名稱 (Timestamp 或 DataSourceLastTime_UTC)
+    # 時間欄位名稱處理
     # -----------------------------------
     if "Timestamp" in df.columns:
         pass
@@ -62,8 +74,11 @@ def load_and_preprocess(csv_path: Path, target_mmsi: int) -> pd.DataFrame:
         print(f" 找不到時間欄位，欄位清單: {list(df.columns)}")
         raise ValueError("請確認時間欄位名稱 (必須是 Timestamp 或 DataSourceLastTime_UTC)")
 
-    # ⚠️ 現在才用 MMSI 篩選
-    df = df[df["MMSI"] == target_mmsi].copy()
+    # 現在才用 MMSI 篩選
+    #df = df[df["MMSI"] == target_mmsi].copy()
+    #  強制轉成整數後比對（避免 636012794 vs 636012794.0）
+    df = df[df["MMSI"].round().astype("Int64") == int(target_mmsi)].copy()
+
 
     # 基本欄位清理
     df["Lat"] = pd.to_numeric(df["Lat"], errors="coerce")
@@ -86,7 +101,9 @@ def load_and_preprocess(csv_path: Path, target_mmsi: int) -> pd.DataFrame:
     return df
 
 
-# 測試用：直接執行時需要手動給參數
+# --------------------------------------------------------
+# 測試用（可單獨執行）
+# --------------------------------------------------------
 if __name__ == "__main__":
     sample_path = Path(r"C:\Users\slab\Desktop") / "Slab Project" / "Stage1" / "data" / "370359000.csv"
     sample_mmsi = 370359000
