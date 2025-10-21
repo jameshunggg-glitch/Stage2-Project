@@ -17,7 +17,7 @@
             <meta name="viewport" content="width=device-width,
                 initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
             <style>
-                #map_92a87e25e798f3ae979f2f261c92d4a9 {
+                #map_19b9eae1199bbb2c411eb2229970249c {
                     position: relative;
                     width: 100.0%;
                     height: 100.0%;
@@ -54,16 +54,16 @@
 <body>
     
     
-            <div class="folium-map" id="map_92a87e25e798f3ae979f2f261c92d4a9" ></div>
+            <div class="folium-map" id="map_19b9eae1199bbb2c411eb2229970249c" ></div>
         
 </body>
 <script>
     
     
-            var map_92a87e25e798f3ae979f2f261c92d4a9 = L.map(
-                "map_92a87e25e798f3ae979f2f261c92d4a9",
+            var map_19b9eae1199bbb2c411eb2229970249c = L.map(
+                "map_19b9eae1199bbb2c411eb2229970249c",
                 {
-                    center: [8.851995, 104.778485],
+                    center: [22.1, 120.0],
                     crs: L.CRS.EPSG3857,
                     ...{
   "zoom": 5,
@@ -78,7 +78,7 @@
 
         
     
-            var tile_layer_d26d465b05b786a85b35330c83deab66 = L.tileLayer(
+            var tile_layer_e7dea2098a3a686f16ffff3692637512 = L.tileLayer(
                 "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
                 {
   "minZoom": 0,
@@ -95,40 +95,44 @@
             );
         
     
-            tile_layer_d26d465b05b786a85b35330c83deab66.addTo(map_92a87e25e798f3ae979f2f261c92d4a9);
+            tile_layer_e7dea2098a3a686f16ffff3692637512.addTo(map_19b9eae1199bbb2c411eb2229970249c);
         
     
-            var poly_line_c388e7f7d48b1dda6a4a9bb6c30af4d9 = L.polyline(
-                [[8.4, 104.9]],
+            var poly_line_18fbe35e5a9c1e083212acb4af06faed = L.polyline(
+                [[25.0, 121.5], [25.7, 120.0], [22.1, 120.0], [23.0, 120.3]],
                 {"bubblingMouseEvents": true, "color": "#3388ff", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "#3388ff", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.9, "smoothFactor": 1.0, "stroke": true, "weight": 4}
-            ).addTo(map_92a87e25e798f3ae979f2f261c92d4a9);
+            ).addTo(map_19b9eae1199bbb2c411eb2229970249c);
         
     
-        var popup_f80440243531f36e2303254aaaf1698f = L.popup({
-  "maxWidth": "100%",
-});
-
-        
-            
-                var html_86c27cfaf1e36f0c27c80c16b181e38f = $(`<div id="html_86c27cfaf1e36f0c27c80c16b181e38f" style="width: 100.0%; height: 100.0%;">Distance: 0.00 naut</div>`)[0];
-                popup_f80440243531f36e2303254aaaf1698f.setContent(html_86c27cfaf1e36f0c27c80c16b181e38f);
-            
-        
-
-        poly_line_c388e7f7d48b1dda6a4a9bb6c30af4d9.bindPopup(popup_f80440243531f36e2303254aaaf1698f)
-        ;
-
+            poly_line_18fbe35e5a9c1e083212acb4af06faed.bindTooltip(
+                `<div>
+                     Shortest sea route • 674.7 km
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
         
     
-    
-            var marker_fc5758a7ed09ad39b0112e46332e5e48 = L.marker(
-                [8.83801, 106.02947],
+            var marker_1044a25b31f7e66524ac69bf7b45dbf3 = L.marker(
+                [25.0, 121.5],
                 {
 }
-            ).addTo(map_92a87e25e798f3ae979f2f261c92d4a9);
+            ).addTo(map_19b9eae1199bbb2c411eb2229970249c);
         
     
-            marker_fc5758a7ed09ad39b0112e46332e5e48.bindTooltip(
+            var icon_f57de3b47f7102f9ff7226ff40cd030c = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "info-sign",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+            marker_1044a25b31f7e66524ac69bf7b45dbf3.bindTooltip(
                 `<div>
                      Origin
                  </div>`,
@@ -138,14 +142,28 @@
             );
         
     
-            var marker_1c8e7392fb4a90711a47fbc10124144e = L.marker(
-                [8.86598, 103.5275],
+                marker_1044a25b31f7e66524ac69bf7b45dbf3.setIcon(icon_f57de3b47f7102f9ff7226ff40cd030c);
+            
+    
+            var marker_6d4789559f295d3147b4719255eedf6d = L.marker(
+                [23.0, 120.3],
                 {
 }
-            ).addTo(map_92a87e25e798f3ae979f2f261c92d4a9);
+            ).addTo(map_19b9eae1199bbb2c411eb2229970249c);
         
     
-            marker_1c8e7392fb4a90711a47fbc10124144e.bindTooltip(
+            var icon_e46917e79842144fb64274a257673a9c = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "info-sign",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+            marker_6d4789559f295d3147b4719255eedf6d.bindTooltip(
                 `<div>
                      Destination
                  </div>`,
@@ -155,38 +173,7 @@
             );
         
     
-            var marker_8c4189c2d40ac5852f9c6773184045b0 = L.marker(
-                [8.4, 104.9],
-                {
-}
-            ).addTo(map_92a87e25e798f3ae979f2f261c92d4a9);
-        
-    
-        var popup_d58927035cc2eb9b557aebc700419316 = L.popup({
-  "maxWidth": 250,
-});
-
-        
+                marker_6d4789559f295d3147b4719255eedf6d.setIcon(icon_e46917e79842144fb64274a257673a9c);
             
-                var html_0be614d8cf48f66fbace1187a16e72d2 = $(`<div id="html_0be614d8cf48f66fbace1187a16e72d2" style="width: 100.0%; height: 100.0%;">Distance: 0.00 naut</div>`)[0];
-                popup_d58927035cc2eb9b557aebc700419316.setContent(html_0be614d8cf48f66fbace1187a16e72d2);
-            
-        
-
-        marker_8c4189c2d40ac5852f9c6773184045b0.bindPopup(popup_d58927035cc2eb9b557aebc700419316)
-        ;
-
-        
-    
-    
-            marker_8c4189c2d40ac5852f9c6773184045b0.bindTooltip(
-                `<div>
-                     Route summary
-                 </div>`,
-                {
-  "sticky": true,
-}
-            );
-        
 </script>
 </html>
