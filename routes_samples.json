@@ -1,0 +1,62 @@
+[
+  {
+    "From": "TWKHH",
+    "To": "KHKOS",
+    "Sog": 8,
+    "track": "ERROR",
+    "coor": "ERROR",
+    "distance_km": "ERROR",
+    "duration_h": "ERROR",
+    "error_msg": "LVS failed in both directions. fwd=LVS: path not found., rev=LVS: path not found."
+  },
+  {
+    "From": "TWKHH",
+    "To": "KHKOS",
+    "Sog": 10,
+    "track": "ERROR",
+    "coor": "ERROR",
+    "distance_km": "ERROR",
+    "duration_h": "ERROR",
+    "error_msg": "LVS failed in both directions. fwd=LVS: path not found., rev=LVS: path not found."
+  },
+  {
+    "From": "TWKHH",
+    "To": "KHKOS",
+    "Sog": 12,
+    "track": "ERROR",
+    "coor": "ERROR",
+    "distance_km": "ERROR",
+    "duration_h": "ERROR",
+    "error_msg": "LVS failed in both directions. fwd=LVS: path not found., rev=LVS: path not found."
+  },
+  {
+    "From": "KHKOS",
+    "To": "TWKHH",
+    "Sog": 8,
+    "track": "ERROR",
+    "coor": "ERROR",
+    "distance_km": "ERROR",
+    "duration_h": "ERROR",
+    "error_msg": "LVS failed in both directions. fwd=LVS: path not found., rev=LVS: path not found."
+  },
+  {
+    "From": "KHKOS",
+    "To": "TWKHH",
+    "Sog": 10,
+    "track": "ERROR",
+    "coor": "ERROR",
+    "distance_km": "ERROR",
+    "duration_h": "ERROR",
+    "error_msg": "LVS failed in both directions. fwd=LVS: path not found., rev=LVS: path not found."
+  },
+  {
+    "From": "KHKOS",
+    "To": "TWKHH",
+    "Sog": 12,
+    "track": "ERROR",
+    "coor": "ERROR",
+    "distance_km": "ERROR",
+    "duration_h": "ERROR",
+    "error_msg": "LVS failed in both directions. fwd=LVS: path not found., rev=LVS: path not found."
+  }
+]
