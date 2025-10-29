@@ -39,6 +39,11 @@ def geodesic_midpoint(a: Tuple[float,float], b: Tuple[float,float]) -> Tuple[flo
     pts = geodesic_sample(a, b, step_km=500.0)
     return pts[len(pts)//2]
 
+# --- compatibility aliases ---
+def great_circle_midpoint(a, b):
+    """Alias for backward compatibility."""
+    return geodesic_midpoint(a, b)
+
 def bearing_xy(a: Tuple[float,float], b: Tuple[float,float]) -> float:
     ax, ay = to_m(a[0], a[1]); bx, by = to_m(b[0], b[1])
     return math.degrees(math.atan2(by - ay, bx - ax)) % 360.0
