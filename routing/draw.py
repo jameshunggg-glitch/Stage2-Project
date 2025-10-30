@@ -1,82 +1,179 @@
 # routing/draw.py
 # -*- coding: utf-8 -*-
 from __future__ import annotations
-from typing import List, Tuple, Optional, Iterable
-
+from typing import List, Tuple, Iterable, Dict, Any, Optional
 import folium
+
+from shapely.geometry import mapping as shapely_mapping
+from shapely.geometry.base import BaseGeometry
 
 from .geodesy import geodesic_sample, normalize_lon_to_pacific_view
 
+LonLat = Tuple[float, float]
 
+# ------------------------------------------------------------
+# 基礎工具：經緯度轉 folium 座標（太平洋視角：經度 0~360）
+# ------------------------------------------------------------
+def _to_latlon_ll(points_ll: Iterable[LonLat], pacific_view: bool = True) -> List[Tuple[float, float]]:
+    latlons: List[Tuple[float, float]] = []
+    for lon, lat in points_ll:
+        lon_plot = normalize_lon_to_pacific_view(lon) if pacific_view else lon
+        latlons.append((lat, lon_plot))
+    return latlons
+
+# ------------------------------------------------------------
+# 1) 連續大圓折線（跨換日線不斷裂）
+# ------------------------------------------------------------
 def draw_gc_polyline_continuous(
-    m_or_fg,
-    a: Tuple[float, float],
-    b: Tuple[float, float],
+    m: folium.Map | folium.FeatureGroup,
+    a_ll: LonLat,
+    b_ll: LonLat,
     step_km: float = 20.0,
-    **style,
-):
+    weight: int = 5,
+    opacity: float = 0.9,
+    dash_array: Optional[str] = None,
+    color: str = "#1f77b4",
+) -> folium.PolyLine:
     """
-    在「太平洋視角」下，沿大圓將 a->b 畫成連續折線，
-    自動把經度 <0 轉到 [0,360) 以避免越界斷線。
-    m_or_fg: folium.Map 或 folium.FeatureGroup
+    以大圓分段密化 (lon,lat)→(lat,lon_plot)，確保跨國際換日線時視覺連續。
     """
-    pts = geodesic_sample(a, b, step_km=step_km)
-    folium_coords = []
-    for lon, lat in pts:
-        lon_pacific = normalize_lon_to_pacific_view(lon)
-        folium_coords.append([lat, lon_pacific])
-    folium.PolyLine(folium_coords, **style).add_to(m_or_fg)
+    pts = geodesic_sample(a_ll, b_ll, step_km=max(1.0, float(step_km)))
+    latlons = _to_latlon_ll(pts, pacific_view=True)
+    pl = folium.PolyLine(
+        latlons,
+        weight=weight,
+        opacity=opacity,
+        color=color,
+        dash_array=dash_array
+    )
+    pl.add_to(m)
+    return pl
 
-
-def convert_geom_to_pacific(geom):
+# ------------------------------------------------------------
+# 2) 形狀資料轉太平洋視角（給 folium.GeoJson 使用）
+# ------------------------------------------------------------
+def _convert_coords_pacific(obj: Any) -> Any:
     """
-    把 Polygon/MultiPolygon 的經度換成太平洋視角（[0,360)），
-    回傳可直接丟給 folium.GeoJson 的 dict。
+    遞迴處理 coordinates：將 (lon,lat) 的 lon 轉為 0~360。
+    可處理 GeoJSON-like 結構。
     """
-    from shapely.geometry import mapping
-    geom_dict = mapping(geom)
-
-    def convert_coords(coords):
-        if isinstance(coords[0], (list, tuple)):
-            return [convert_coords(c) for c in coords]
+    if isinstance(obj, (list, tuple)):
+        if len(obj) == 2 and all(isinstance(x, (int, float)) for x in obj):
+            lon, lat = obj
+            return [normalize_lon_to_pacific_view(float(lon)), float(lat)]
         else:
-            lon, lat = coords[0], coords[1]
-            lon_pacific = normalize_lon_to_pacific_view(lon)
-            return [lon_pacific, lat]
+            return [ _convert_coords_pacific(x) for x in obj ]
+    elif isinstance(obj, dict):
+        out = {}
+        for k, v in obj.items():
+            if k == "coordinates":
+                out[k] = _convert_coords_pacific(v)
+            else:
+                out[k] = _convert_coords_pacific(v)
+        return out
+    else:
+        return obj
 
-    if geom_dict["type"] == "Polygon":
-        geom_dict["coordinates"] = [convert_coords(ring) for ring in geom_dict["coordinates"]]
-    elif geom_dict["type"] == "MultiPolygon":
-        geom_dict["coordinates"] = [[convert_coords(ring) for ring in poly] for poly in geom_dict["coordinates"]]
-    return geom_dict
+def convert_geom_to_pacific(geom: BaseGeometry | Dict[str, Any]) -> Dict[str, Any]:
+    """
+    接受 shapely geometry 或 GeoJSON-like dict，回傳 GeoJSON-like dict，
+    其 coordinates 的經度已轉為 0~360。
+    """
+    if isinstance(geom, BaseGeometry):
+        gj = shapely_mapping(geom)  # -> {'type': 'Polygon', 'coordinates': [...]}
+    elif isinstance(geom, dict):
+        gj = geom
+    else:
+        raise TypeError("convert_geom_to_pacific expects a shapely geometry or GeoJSON-like dict.")
+    # GeoJSON Feature/Geometry 都支援
+    if "type" in gj:
+        if gj["type"] == "Feature":
+            feat = dict(gj)
+            geom_part = feat.get("geometry")
+            if geom_part:
+                geom_part = _convert_coords_pacific(geom_part)
+                feat["geometry"] = geom_part
+            return feat
+        else:
+            return _convert_coords_pacific(gj)
+    else:
+        # 非標準格式，嘗試遞迴
+        return _convert_coords_pacific(gj)
 
-
+# ------------------------------------------------------------
+# 3) SCGraph 單一路徑圖層（可切換）
+# ------------------------------------------------------------
 def add_scgraph_layer(
-    m: folium.Map,
-    sc_track: List[Tuple[float, float]],
-    *,
-    name: str = "SCGraph Path",
+    m: folium.Map | folium.FeatureGroup,
+    track_ll: List[LonLat],
+    name: str = "SCGraph O→D path",
     show: bool = False,
     step_km: float = 20.0,
-    weight: int = 4,
+    weight: int = 5,
     opacity: float = 0.9,
     dash_array: str = "8,6",
     color: str = "#ff7f0e",
-) -> Optional[folium.FeatureGroup]:
+) -> folium.FeatureGroup:
     """
-    把 scgraph 的 polyline（(lon,lat) 座標序列）畫成可切換的圖層。
-    - 會在圖層控制（LayerControl）右上角顯示 `name` 供勾選
-    - 預設使用橘色虛線，避免與你主航線（藍/紅）混淆
-    回傳建立的 FeatureGroup（若 sc_track 無法畫則回傳 None）
+    將「單一路徑」(list[(lon,lat)]) 畫成可切換圖層。
+    以大圓分段密化，確保跨日界線連續與不穿陸視覺。
     """
-    if not sc_track or len(sc_track) < 2:
-        return None
-
     fg = folium.FeatureGroup(name=name, show=show)
-    for a, b in zip(sc_track[:-1], sc_track[1:]):
-        draw_gc_polyline_continuous(
-            fg, a, b, step_km=step_km,
-            color=color, weight=weight, opacity=opacity, dash_array=dash_array
-        )
+
+    if not track_ll or len(track_ll) < 2:
+        fg.add_to(m)
+        return fg
+
+    step_km = max(1.0, float(step_km))
+    for a, b in zip(track_ll[:-1], track_ll[1:]):
+        densified = geodesic_sample(a, b, step_km=step_km)
+        latlons = _to_latlon_ll(densified, pacific_view=True)
+        folium.PolyLine(
+            latlons,
+            weight=weight,
+            opacity=opacity,
+            dash_array=dash_array,
+            color=color
+        ).add_to(fg)
+
+    fg.add_to(m)
+    return fg
+
+# ------------------------------------------------------------
+# 4) SCGraph 子網路邊集合圖層（可切換）
+# ------------------------------------------------------------
+def add_scgraph_network_layer(
+    m: folium.Map | folium.FeatureGroup,
+    edges_ll: List[Tuple[LonLat, LonLat]],
+    name: str = "SCGraph Network",
+    show: bool = False,
+    weight: int = 2,
+    opacity: float = 0.8,
+    dash_array: str = "4,6",
+    color: str = "#ff7f0e",
+    step_km: float = 12.0,
+) -> folium.FeatureGroup:
+    """
+    將「子網的所有邊」畫成可切換圖層。
+    edges_ll: list of ((lon1,lat1),(lon2,lat2))
+    """
+    fg = folium.FeatureGroup(name=name, show=show)
+
+    if not edges_ll:
+        fg.add_to(m)
+        return fg
+
+    step_km = max(1.0, float(step_km))
+    for (a, b) in edges_ll:
+        densified = geodesic_sample(a, b, step_km=step_km)
+        latlons = _to_latlon_ll(densified, pacific_view=True)
+        folium.PolyLine(
+            latlons,
+            weight=weight,
+            opacity=opacity,
+            dash_array=dash_array,
+            color=color
+        ).add_to(fg)
+
     fg.add_to(m)
     return fg
