@@ -142,7 +142,13 @@ def plan_route(
                 dbg(f"[SCGRAPH] O→D path FAILED | error={sc_error}")
 
     # ---------------- (C) 組合 nodes + 白名單邊 ----------------
-    base_nodes = [origin_adj, dest_adj] + feature_nodes
+    #base_nodes = [origin_adj, dest_adj] + feature_nodes
+    # 先起訖 → SC 節點（航道骨幹）→ 最後才塞陸地特徵點
+    base_nodes: List[Tuple[float, float]] = [origin_adj, dest_adj]
+    if sc_nodes_extra:
+        base_nodes.extend(sc_nodes_extra)
+    base_nodes.extend(feature_nodes)
+
     # 併入 sc 的 keypoints（高價值節點）
     if sc_nodes_extra:
         base_nodes.extend(sc_nodes_extra)
