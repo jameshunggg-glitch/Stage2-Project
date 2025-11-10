@@ -1,0 +1,3665 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/python-visualization/folium/folium/templates/leaflet.awesome.rotate.min.css"/>
+    
+            <meta name="viewport" content="width=device-width,
+                initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+            <style>
+                #map_531e709cee1be874643502e37f3f3140 {
+                    position: relative;
+                    width: 100.0%;
+                    height: 100.0%;
+                    left: 0.0%;
+                    top: 0.0%;
+                }
+                .leaflet-container { font-size: 1rem; }
+            </style>
+
+            <style>html, body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            </style>
+
+            <style>#map {
+                position:absolute;
+                top:0;
+                bottom:0;
+                right:0;
+                left:0;
+                }
+            </style>
+
+            <script>
+                L_NO_TOUCH = false;
+                L_DISABLE_3D = false;
+            </script>
+
+        
+</head>
+<body>
+    
+    
+            <div class="folium-map" id="map_531e709cee1be874643502e37f3f3140" ></div>
+        
+</body>
+<script>
+    
+    
+            var map_531e709cee1be874643502e37f3f3140 = L.map(
+                "map_531e709cee1be874643502e37f3f3140",
+                {
+                    center: [14.0, 120.0],
+                    crs: L.CRS.EPSG3857,
+                    ...{
+  "zoom": 4,
+  "zoomControl": true,
+  "preferCanvas": false,
+}
+
+                }
+            );
+
+            
+
+        
+    
+            var tile_layer_9b84c22761904c24b902bb990279c8fe = L.tileLayer(
+                "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                {
+  "minZoom": 0,
+  "maxZoom": 19,
+  "maxNativeZoom": 19,
+  "noWrap": false,
+  "attribution": "\u0026copy; \u003ca href=\"https://www.openstreetmap.org/copyright\"\u003eOpenStreetMap\u003c/a\u003e contributors",
+  "subdomains": "abc",
+  "detectRetina": false,
+  "tms": false,
+  "opacity": 1,
+}
+
+            );
+        
+    
+            tile_layer_9b84c22761904c24b902bb990279c8fe.addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+            var circle_marker_489ddb95ff4b0edfc0870042af4b64d1 = L.circleMarker(
+                [31.0065, 122.648767],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_caa22cca1b51dee8987f328b05ac613d = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_86e240a5773813fbaede3d5341e9d61c = $(`<div id="html_86e240a5773813fbaede3d5341e9d61c" style="width: 100.0%; height: 100.0%;">stop_id: 1<br>port: LUHUASHAN<br>duration: 13.35 h<br>r95: 0.233 km<br>dh_std: 129.3°<br>dist_port: 25.20 km</div>`)[0];
+                popup_caa22cca1b51dee8987f328b05ac613d.setContent(html_86e240a5773813fbaede3d5341e9d61c);
+            
+        
+
+        circle_marker_489ddb95ff4b0edfc0870042af4b64d1.bindPopup(popup_caa22cca1b51dee8987f328b05ac613d)
+        ;
+
+        
+    
+    
+            circle_marker_489ddb95ff4b0edfc0870042af4b64d1.bindTooltip(
+                `<div>
+                     LUHUASHAN | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_543e54b273ffe356bea75a568b624d3f = L.circleMarker(
+                [31.3403415, 121.649225],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_f8985eae0f9b6623d264ca8f7e1aeacc = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_e55b1d8460834e1062f4e2efa5b09b5d = $(`<div id="html_e55b1d8460834e1062f4e2efa5b09b5d" style="width: 100.0%; height: 100.0%;">stop_id: 2<br>port: SHANGHAI<br>duration: 2.62 h<br>r95: 0.040 km<br>dh_std: 2.2°<br>dist_port: 4.37 km</div>`)[0];
+                popup_f8985eae0f9b6623d264ca8f7e1aeacc.setContent(html_e55b1d8460834e1062f4e2efa5b09b5d);
+            
+        
+
+        circle_marker_543e54b273ffe356bea75a568b624d3f.bindPopup(popup_f8985eae0f9b6623d264ca8f7e1aeacc)
+        ;
+
+        
+    
+    
+            circle_marker_543e54b273ffe356bea75a568b624d3f.bindTooltip(
+                `<div>
+                     SHANGHAI | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_8430e45dd17e13847bc94c6aadc696f5 = L.circleMarker(
+                [31.340233, 121.649217],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_3011f86b05207e92a98be72d78497e7f = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_ac92a3d13b277a3d7224d416410b73a5 = $(`<div id="html_ac92a3d13b277a3d7224d416410b73a5" style="width: 100.0%; height: 100.0%;">stop_id: 3<br>port: SHANGHAI<br>duration: 8.88 h<br>r95: 0.039 km<br>dh_std: 0.4°<br>dist_port: 4.38 km</div>`)[0];
+                popup_3011f86b05207e92a98be72d78497e7f.setContent(html_ac92a3d13b277a3d7224d416410b73a5);
+            
+        
+
+        circle_marker_8430e45dd17e13847bc94c6aadc696f5.bindPopup(popup_3011f86b05207e92a98be72d78497e7f)
+        ;
+
+        
+    
+    
+            circle_marker_8430e45dd17e13847bc94c6aadc696f5.bindTooltip(
+                `<div>
+                     SHANGHAI | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_d315166790aceebe6ba8b9e9e2f6372f = L.circleMarker(
+                [10.6584915, 103.4701585],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_e5d433dfa2e4daecc68519c52d380540 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_7f63bb94ffeb7f3d72a3d1772ac241fe = $(`<div id="html_7f63bb94ffeb7f3d72a3d1772ac241fe" style="width: 100.0%; height: 100.0%;">stop_id: 4<br>port: SIHANOUKVILLE<br>duration: 0.57 h<br>r95: 0.109 km<br>dh_std: 9.1°<br>dist_port: 4.22 km</div>`)[0];
+                popup_e5d433dfa2e4daecc68519c52d380540.setContent(html_7f63bb94ffeb7f3d72a3d1772ac241fe);
+            
+        
+
+        circle_marker_d315166790aceebe6ba8b9e9e2f6372f.bindPopup(popup_e5d433dfa2e4daecc68519c52d380540)
+        ;
+
+        
+    
+    
+            circle_marker_d315166790aceebe6ba8b9e9e2f6372f.bindTooltip(
+                `<div>
+                     SIHANOUKVILLE | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_4bd456cf1b4a75f0aff7cb7385593c0a = L.circleMarker(
+                [10.648133, 103.5103],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_1a296d6ae48f94a83d45a744d45eed2b = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_3963dd1ca642105931f0192c8eb6fac5 = $(`<div id="html_3963dd1ca642105931f0192c8eb6fac5" style="width: 100.0%; height: 100.0%;">stop_id: 5<br>port: SIHANOUKVILLE<br>duration: 5.48 h<br>r95: 0.024 km<br>dh_std: 0.5°<br>dist_port: 0.37 km</div>`)[0];
+                popup_1a296d6ae48f94a83d45a744d45eed2b.setContent(html_3963dd1ca642105931f0192c8eb6fac5);
+            
+        
+
+        circle_marker_4bd456cf1b4a75f0aff7cb7385593c0a.bindPopup(popup_1a296d6ae48f94a83d45a744d45eed2b)
+        ;
+
+        
+    
+    
+            circle_marker_4bd456cf1b4a75f0aff7cb7385593c0a.bindTooltip(
+                `<div>
+                     SIHANOUKVILLE | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_518c0d9b5c8983d44710c49794053ffc = L.circleMarker(
+                [10.648117, 103.51035],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_5b4f2db61456070ae9b00411e48deb72 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_4850b41cf38a9419cdefba1a780c0fc9 = $(`<div id="html_4850b41cf38a9419cdefba1a780c0fc9" style="width: 100.0%; height: 100.0%;">stop_id: 6<br>port: SIHANOUKVILLE<br>duration: 0.80 h<br>r95: 0.008 km<br>dh_std: 0.0°<br>dist_port: 0.38 km</div>`)[0];
+                popup_5b4f2db61456070ae9b00411e48deb72.setContent(html_4850b41cf38a9419cdefba1a780c0fc9);
+            
+        
+
+        circle_marker_518c0d9b5c8983d44710c49794053ffc.bindPopup(popup_5b4f2db61456070ae9b00411e48deb72)
+        ;
+
+        
+    
+    
+            circle_marker_518c0d9b5c8983d44710c49794053ffc.bindTooltip(
+                `<div>
+                     SIHANOUKVILLE | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_43b1bb3a24dcb5b163b06a9c7d8efefc = L.circleMarker(
+                [10.6481, 103.510317],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_83be530b03e2f4c5460a1d70e0fec348 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_561062638fc328ef6dcfab0fd09c13db = $(`<div id="html_561062638fc328ef6dcfab0fd09c13db" style="width: 100.0%; height: 100.0%;">stop_id: 7<br>port: SIHANOUKVILLE<br>duration: 1.00 h<br>r95: 0.013 km<br>dh_std: 0.0°<br>dist_port: 0.37 km</div>`)[0];
+                popup_83be530b03e2f4c5460a1d70e0fec348.setContent(html_561062638fc328ef6dcfab0fd09c13db);
+            
+        
+
+        circle_marker_43b1bb3a24dcb5b163b06a9c7d8efefc.bindPopup(popup_83be530b03e2f4c5460a1d70e0fec348)
+        ;
+
+        
+    
+    
+            circle_marker_43b1bb3a24dcb5b163b06a9c7d8efefc.bindTooltip(
+                `<div>
+                     SIHANOUKVILLE | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_45772eef9873853bc6f5f24c833c1f86 = L.circleMarker(
+                [10.648133, 103.5103],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_7918cf986fa6265f98111b29e9e5c0ea = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_251c2b7299ef0d9889be423441709e4d = $(`<div id="html_251c2b7299ef0d9889be423441709e4d" style="width: 100.0%; height: 100.0%;">stop_id: 8<br>port: SIHANOUKVILLE<br>duration: 0.79 h<br>r95: 0.017 km<br>dh_std: 0.3°<br>dist_port: 0.37 km</div>`)[0];
+                popup_7918cf986fa6265f98111b29e9e5c0ea.setContent(html_251c2b7299ef0d9889be423441709e4d);
+            
+        
+
+        circle_marker_45772eef9873853bc6f5f24c833c1f86.bindPopup(popup_7918cf986fa6265f98111b29e9e5c0ea)
+        ;
+
+        
+    
+    
+            circle_marker_45772eef9873853bc6f5f24c833c1f86.bindTooltip(
+                `<div>
+                     SIHANOUKVILLE | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_6a0db68b9c7dff3e4c86fe7d0d56b304 = L.circleMarker(
+                [10.648117, 103.51035],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_6c214e5b696268dca19365b6a5c0cc34 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_e5e495304696a86a87d294a6a76f80b9 = $(`<div id="html_e5e495304696a86a87d294a6a76f80b9" style="width: 100.0%; height: 100.0%;">stop_id: 9<br>port: SIHANOUKVILLE<br>duration: 3.45 h<br>r95: 0.012 km<br>dh_std: 0.5°<br>dist_port: 0.38 km</div>`)[0];
+                popup_6c214e5b696268dca19365b6a5c0cc34.setContent(html_e5e495304696a86a87d294a6a76f80b9);
+            
+        
+
+        circle_marker_6a0db68b9c7dff3e4c86fe7d0d56b304.bindPopup(popup_6c214e5b696268dca19365b6a5c0cc34)
+        ;
+
+        
+    
+    
+            circle_marker_6a0db68b9c7dff3e4c86fe7d0d56b304.bindTooltip(
+                `<div>
+                     SIHANOUKVILLE | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_5321c36eaa3f49dd347680994249f3e6 = L.circleMarker(
+                [10.648167, 103.510333],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_b0ab918f36f9db250600fa6c87c7ed70 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_871fd162a76153afbcaa7f63c3241d6c = $(`<div id="html_871fd162a76153afbcaa7f63c3241d6c" style="width: 100.0%; height: 100.0%;">stop_id: 10<br>port: SIHANOUKVILLE<br>duration: 1.20 h<br>r95: 0.013 km<br>dh_std: 0.0°<br>dist_port: 0.38 km</div>`)[0];
+                popup_b0ab918f36f9db250600fa6c87c7ed70.setContent(html_871fd162a76153afbcaa7f63c3241d6c);
+            
+        
+
+        circle_marker_5321c36eaa3f49dd347680994249f3e6.bindPopup(popup_b0ab918f36f9db250600fa6c87c7ed70)
+        ;
+
+        
+    
+    
+            circle_marker_5321c36eaa3f49dd347680994249f3e6.bindTooltip(
+                `<div>
+                     SIHANOUKVILLE | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_4353d6af527dd2d489655478befc8b61 = L.circleMarker(
+                [10.6481, 103.510333],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_bd93251eb4e78cfb68411f85bc039eae = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_a0efe70d6c95b84469b08294f2dd16a1 = $(`<div id="html_a0efe70d6c95b84469b08294f2dd16a1" style="width: 100.0%; height: 100.0%;">stop_id: 11<br>port: SIHANOUKVILLE<br>duration: 1.36 h<br>r95: 0.013 km<br>dh_std: 0.5°<br>dist_port: 0.38 km</div>`)[0];
+                popup_bd93251eb4e78cfb68411f85bc039eae.setContent(html_a0efe70d6c95b84469b08294f2dd16a1);
+            
+        
+
+        circle_marker_4353d6af527dd2d489655478befc8b61.bindPopup(popup_bd93251eb4e78cfb68411f85bc039eae)
+        ;
+
+        
+    
+    
+            circle_marker_4353d6af527dd2d489655478befc8b61.bindTooltip(
+                `<div>
+                     SIHANOUKVILLE | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_c8e2ccfbfb510a0d42091cd67ba4f527 = L.circleMarker(
+                [13.356433, 100.666833],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_5ced8377dbf3e2bf1ac1026dea13019c = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_81702300dcbba00b387dcfbf44afe058 = $(`<div id="html_81702300dcbba00b387dcfbf44afe058" style="width: 100.0%; height: 100.0%;">stop_id: 12<br>port: KO SICHANG<br>duration: 2.70 h<br>r95: 0.044 km<br>dh_std: 10.1°<br>dist_port: 28.32 km</div>`)[0];
+                popup_5ced8377dbf3e2bf1ac1026dea13019c.setContent(html_81702300dcbba00b387dcfbf44afe058);
+            
+        
+
+        circle_marker_c8e2ccfbfb510a0d42091cd67ba4f527.bindPopup(popup_5ced8377dbf3e2bf1ac1026dea13019c)
+        ;
+
+        
+    
+    
+            circle_marker_c8e2ccfbfb510a0d42091cd67ba4f527.bindTooltip(
+                `<div>
+                     KO SICHANG | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_9ddfa642960e5ce7525798b57b0ffb3d = L.circleMarker(
+                [13.695883, 100.586233],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_8a619639f575e57f339772316dae7089 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_e06300542bcf48dd32637fb90f7dabbd = $(`<div id="html_e06300542bcf48dd32637fb90f7dabbd" style="width: 100.0%; height: 100.0%;">stop_id: 13<br>port: BANGKOK<br>duration: 19.85 h<br>r95: 0.014 km<br>dh_std: 0.5°<br>dist_port: 9.34 km</div>`)[0];
+                popup_8a619639f575e57f339772316dae7089.setContent(html_e06300542bcf48dd32637fb90f7dabbd);
+            
+        
+
+        circle_marker_9ddfa642960e5ce7525798b57b0ffb3d.bindPopup(popup_8a619639f575e57f339772316dae7089)
+        ;
+
+        
+    
+    
+            circle_marker_9ddfa642960e5ce7525798b57b0ffb3d.bindTooltip(
+                `<div>
+                     BANGKOK | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_f948b62b7acd4ebfd79c39ca33bcd70a = L.circleMarker(
+                [13.0646, 100.892217],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_ecb3aea56122eee0ac1b7d72598d1dd3 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_6301ff31e990d13952e69a8f5cd1380b = $(`<div id="html_6301ff31e990d13952e69a8f5cd1380b" style="width: 100.0%; height: 100.0%;">stop_id: 14<br>port: LAEM CHABANG<br>duration: 13.13 h<br>r95: 0.021 km<br>dh_std: 0.2°<br>dist_port: 0.71 km</div>`)[0];
+                popup_ecb3aea56122eee0ac1b7d72598d1dd3.setContent(html_6301ff31e990d13952e69a8f5cd1380b);
+            
+        
+
+        circle_marker_f948b62b7acd4ebfd79c39ca33bcd70a.bindPopup(popup_ecb3aea56122eee0ac1b7d72598d1dd3)
+        ;
+
+        
+    
+    
+            circle_marker_f948b62b7acd4ebfd79c39ca33bcd70a.bindTooltip(
+                `<div>
+                     LAEM CHABANG | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_425bff91713829403fb6abb78afc5b6e = L.circleMarker(
+                [21.68055, 108.637317],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_2c9fbbfaafbc56cfcb10d198b7dcb8d0 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_f48d821eed826977505a731631b3b7f4 = $(`<div id="html_f48d821eed826977505a731631b3b7f4" style="width: 100.0%; height: 100.0%;">stop_id: 15<br>port: QINZHOU<br>duration: 4.34 h<br>r95: 0.019 km<br>dh_std: 0.3°<br>dist_port: 1.04 km</div>`)[0];
+                popup_2c9fbbfaafbc56cfcb10d198b7dcb8d0.setContent(html_f48d821eed826977505a731631b3b7f4);
+            
+        
+
+        circle_marker_425bff91713829403fb6abb78afc5b6e.bindPopup(popup_2c9fbbfaafbc56cfcb10d198b7dcb8d0)
+        ;
+
+        
+    
+    
+            circle_marker_425bff91713829403fb6abb78afc5b6e.bindTooltip(
+                `<div>
+                     QINZHOU | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_3e35ab5f26a053f7247b13b9b33cc414 = L.circleMarker(
+                [29.56905, 122.708783],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_f3de0e7910167c0e6744811bcfacf075 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_74b09f5bbd8e8ed1f4c0c2b7f0b0b8ba = $(`<div id="html_74b09f5bbd8e8ed1f4c0c2b7f0b0b8ba" style="width: 100.0%; height: 100.0%;">stop_id: 16<br>port: LIUHENG<br>duration: 1.60 h<br>r95: 0.104 km<br>dh_std: 10.1°<br>dist_port: 58.13 km</div>`)[0];
+                popup_f3de0e7910167c0e6744811bcfacf075.setContent(html_74b09f5bbd8e8ed1f4c0c2b7f0b0b8ba);
+            
+        
+
+        circle_marker_3e35ab5f26a053f7247b13b9b33cc414.bindPopup(popup_f3de0e7910167c0e6744811bcfacf075)
+        ;
+
+        
+    
+    
+            circle_marker_3e35ab5f26a053f7247b13b9b33cc414.bindTooltip(
+                `<div>
+                     LIUHENG | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_194474edda9c225848a87672d817f524 = L.circleMarker(
+                [29.566274999999997, 122.70905],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_2bca5e740ff7243a5c9b1212baeaaf3f = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_d6e745b858aaf94cc1bfbccd68c386ff = $(`<div id="html_d6e745b858aaf94cc1bfbccd68c386ff" style="width: 100.0%; height: 100.0%;">stop_id: 17<br>port: LIUHENG<br>duration: 6.90 h<br>r95: 0.144 km<br>dh_std: 15.5°<br>dist_port: 58.25 km</div>`)[0];
+                popup_2bca5e740ff7243a5c9b1212baeaaf3f.setContent(html_d6e745b858aaf94cc1bfbccd68c386ff);
+            
+        
+
+        circle_marker_194474edda9c225848a87672d817f524.bindPopup(popup_2bca5e740ff7243a5c9b1212baeaaf3f)
+        ;
+
+        
+    
+    
+            circle_marker_194474edda9c225848a87672d817f524.bindTooltip(
+                `<div>
+                     LIUHENG | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_89091048e571e1a583a4aa76fc2d6738 = L.circleMarker(
+                [29.569208500000002, 122.7101],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_43053232946cebcf41b97029a9e3efe5 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_0d60dc187ae07719ac4238aad06a2f79 = $(`<div id="html_0d60dc187ae07719ac4238aad06a2f79" style="width: 100.0%; height: 100.0%;">stop_id: 18<br>port: LIUHENG<br>duration: 7.40 h<br>r95: 0.211 km<br>dh_std: 32.7°<br>dist_port: 58.24 km</div>`)[0];
+                popup_43053232946cebcf41b97029a9e3efe5.setContent(html_0d60dc187ae07719ac4238aad06a2f79);
+            
+        
+
+        circle_marker_89091048e571e1a583a4aa76fc2d6738.bindPopup(popup_43053232946cebcf41b97029a9e3efe5)
+        ;
+
+        
+    
+    
+            circle_marker_89091048e571e1a583a4aa76fc2d6738.bindTooltip(
+                `<div>
+                     LIUHENG | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_f97202f32148b00a487724ec0aa084ef = L.circleMarker(
+                [29.5686085, 122.70962499999999],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_64655d214debf020f165e3be1c2ab6fe = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_1518931e8b92e466c17b126feee28901 = $(`<div id="html_1518931e8b92e466c17b126feee28901" style="width: 100.0%; height: 100.0%;">stop_id: 19<br>port: LIUHENG<br>duration: 12.70 h<br>r95: 0.279 km<br>dh_std: 73.9°<br>dist_port: 58.22 km</div>`)[0];
+                popup_64655d214debf020f165e3be1c2ab6fe.setContent(html_1518931e8b92e466c17b126feee28901);
+            
+        
+
+        circle_marker_f97202f32148b00a487724ec0aa084ef.bindPopup(popup_64655d214debf020f165e3be1c2ab6fe)
+        ;
+
+        
+    
+    
+            circle_marker_f97202f32148b00a487724ec0aa084ef.bindTooltip(
+                `<div>
+                     LIUHENG | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_33760269a28e580467d7184d944b6afa = L.circleMarker(
+                [29.9359, 121.86865],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_52a578cea6f9f4a1d3809fe3b9d46cdc = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_151221577c039ca7a571da5610f30977 = $(`<div id="html_151221577c039ca7a571da5610f30977" style="width: 100.0%; height: 100.0%;">stop_id: 20<br>port: NINGBO<br>duration: 20.78 h<br>r95: 0.035 km<br>dh_std: 0.2°<br>dist_port: 1.87 km</div>`)[0];
+                popup_52a578cea6f9f4a1d3809fe3b9d46cdc.setContent(html_151221577c039ca7a571da5610f30977);
+            
+        
+
+        circle_marker_33760269a28e580467d7184d944b6afa.bindPopup(popup_52a578cea6f9f4a1d3809fe3b9d46cdc)
+        ;
+
+        
+    
+    
+            circle_marker_33760269a28e580467d7184d944b6afa.bindTooltip(
+                `<div>
+                     NINGBO | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_66a90260c5c43354d3f2773a0d5c5b2b = L.circleMarker(
+                [31.338217, 121.653667],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_b5133d5e789e634fae75b36f710380df = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_2a2db2a0f5a4189f5c9e8c7c66fb7dbf = $(`<div id="html_2a2db2a0f5a4189f5c9e8c7c66fb7dbf" style="width: 100.0%; height: 100.0%;">stop_id: 21<br>port: SHANGHAI<br>duration: 3.61 h<br>r95: 0.016 km<br>dh_std: 0.3°<br>dist_port: 4.85 km</div>`)[0];
+                popup_b5133d5e789e634fae75b36f710380df.setContent(html_2a2db2a0f5a4189f5c9e8c7c66fb7dbf);
+            
+        
+
+        circle_marker_66a90260c5c43354d3f2773a0d5c5b2b.bindPopup(popup_b5133d5e789e634fae75b36f710380df)
+        ;
+
+        
+    
+    
+            circle_marker_66a90260c5c43354d3f2773a0d5c5b2b.bindTooltip(
+                `<div>
+                     SHANGHAI | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_c365b80ccd083acb11f7bae0c9b16b77 = L.circleMarker(
+                [31.33825, 121.65365],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_6ae83b0b07b4cec18e546605c36f65e0 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_0b04086403c8757f14c7300a2efc7854 = $(`<div id="html_0b04086403c8757f14c7300a2efc7854" style="width: 100.0%; height: 100.0%;">stop_id: 22<br>port: SHANGHAI<br>duration: 5.75 h<br>r95: 0.045 km<br>dh_std: 0.0°<br>dist_port: 4.84 km</div>`)[0];
+                popup_6ae83b0b07b4cec18e546605c36f65e0.setContent(html_0b04086403c8757f14c7300a2efc7854);
+            
+        
+
+        circle_marker_c365b80ccd083acb11f7bae0c9b16b77.bindPopup(popup_6ae83b0b07b4cec18e546605c36f65e0)
+        ;
+
+        
+    
+    
+            circle_marker_c365b80ccd083acb11f7bae0c9b16b77.bindTooltip(
+                `<div>
+                     SHANGHAI | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_fe4d4c8a81e782d356586be52351112a = L.circleMarker(
+                [10.676433, 103.465925],
+                {"bubblingMouseEvents": true, "color": "orange", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "orange", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_3aa92cbf62810692b929087704b7f44c = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_8a8b875cfe5f32a3f9d073c8150f3b39 = $(`<div id="html_8a8b875cfe5f32a3f9d073c8150f3b39" style="width: 100.0%; height: 100.0%;">stop_id: 23<br>port: SIHANOUKVILLE<br>duration: 12.45 h<br>r95: 0.264 km<br>dh_std: 44.6°<br>dist_port: 5.54 km</div>`)[0];
+                popup_3aa92cbf62810692b929087704b7f44c.setContent(html_8a8b875cfe5f32a3f9d073c8150f3b39);
+            
+        
+
+        circle_marker_fe4d4c8a81e782d356586be52351112a.bindPopup(popup_3aa92cbf62810692b929087704b7f44c)
+        ;
+
+        
+    
+    
+            circle_marker_fe4d4c8a81e782d356586be52351112a.bindTooltip(
+                `<div>
+                     SIHANOUKVILLE | anchorage
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_c8c626ce3779859756255287120f765b = L.circleMarker(
+                [10.647483, 103.505717],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_6af624cf87856602ffef7657ee62cdc2 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_f1dd1089919cfa51a4ce792023e94909 = $(`<div id="html_f1dd1089919cfa51a4ce792023e94909" style="width: 100.0%; height: 100.0%;">stop_id: 24<br>port: SIHANOUKVILLE<br>duration: 21.83 h<br>r95: 0.031 km<br>dh_std: 1.7°<br>dist_port: 0.14 km</div>`)[0];
+                popup_6af624cf87856602ffef7657ee62cdc2.setContent(html_f1dd1089919cfa51a4ce792023e94909);
+            
+        
+
+        circle_marker_c8c626ce3779859756255287120f765b.bindPopup(popup_6af624cf87856602ffef7657ee62cdc2)
+        ;
+
+        
+    
+    
+            circle_marker_c8c626ce3779859756255287120f765b.bindTooltip(
+                `<div>
+                     SIHANOUKVILLE | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_04b644afdca9c238a261dde949cae49f = L.circleMarker(
+                [10.6481, 103.5103],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_f327b903142fcda4d3f3de3ef5055d17 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_4b7b9094660c63a5a8282edb40f4d515 = $(`<div id="html_4b7b9094660c63a5a8282edb40f4d515" style="width: 100.0%; height: 100.0%;">stop_id: 25<br>port: SIHANOUKVILLE<br>duration: 11.52 h<br>r95: 0.019 km<br>dh_std: 0.7°<br>dist_port: 0.37 km</div>`)[0];
+                popup_f327b903142fcda4d3f3de3ef5055d17.setContent(html_4b7b9094660c63a5a8282edb40f4d515);
+            
+        
+
+        circle_marker_04b644afdca9c238a261dde949cae49f.bindPopup(popup_f327b903142fcda4d3f3de3ef5055d17)
+        ;
+
+        
+    
+    
+            circle_marker_04b644afdca9c238a261dde949cae49f.bindTooltip(
+                `<div>
+                     SIHANOUKVILLE | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_98dfa79f8c87711ee9566af1d42d53cd = L.circleMarker(
+                [13.367533, 100.646317],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_171117182b9a59a38d4718001bc48bee = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_b89c06e799f5a71093ba1a912a91f1cb = $(`<div id="html_b89c06e799f5a71093ba1a912a91f1cb" style="width: 100.0%; height: 100.0%;">stop_id: 26<br>port: BANGKOK<br>duration: 1.10 h<br>r95: 0.034 km<br>dh_std: 9.3°<br>dist_port: 29.69 km</div>`)[0];
+                popup_171117182b9a59a38d4718001bc48bee.setContent(html_b89c06e799f5a71093ba1a912a91f1cb);
+            
+        
+
+        circle_marker_98dfa79f8c87711ee9566af1d42d53cd.bindPopup(popup_171117182b9a59a38d4718001bc48bee)
+        ;
+
+        
+    
+    
+            circle_marker_98dfa79f8c87711ee9566af1d42d53cd.bindTooltip(
+                `<div>
+                     BANGKOK | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_e9c7c8c7c130b28275d2ed8acab83c43 = L.circleMarker(
+                [13.3675, 100.6465],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_fd2cb9d0401029e6caca2ef9a576dae3 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_1a8501bb38ddc8154bb43f94f5b45ed4 = $(`<div id="html_1a8501bb38ddc8154bb43f94f5b45ed4" style="width: 100.0%; height: 100.0%;">stop_id: 27<br>port: BANGKOK<br>duration: 22.85 h<br>r95: 0.057 km<br>dh_std: 11.9°<br>dist_port: 29.70 km</div>`)[0];
+                popup_fd2cb9d0401029e6caca2ef9a576dae3.setContent(html_1a8501bb38ddc8154bb43f94f5b45ed4);
+            
+        
+
+        circle_marker_e9c7c8c7c130b28275d2ed8acab83c43.bindPopup(popup_fd2cb9d0401029e6caca2ef9a576dae3)
+        ;
+
+        
+    
+    
+            circle_marker_e9c7c8c7c130b28275d2ed8acab83c43.bindTooltip(
+                `<div>
+                     BANGKOK | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_480496cac4713370ecd7c864c7d44a82 = L.circleMarker(
+                [13.69855, 100.583767],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_62e04da5e7e756aac3cd38be3f0a0ccc = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_af5343e23de29988743ea629eb768d60 = $(`<div id="html_af5343e23de29988743ea629eb768d60" style="width: 100.0%; height: 100.0%;">stop_id: 28<br>port: BANGKOK<br>duration: 13.44 h<br>r95: 0.035 km<br>dh_std: 3.1°<br>dist_port: 9.52 km</div>`)[0];
+                popup_62e04da5e7e756aac3cd38be3f0a0ccc.setContent(html_af5343e23de29988743ea629eb768d60);
+            
+        
+
+        circle_marker_480496cac4713370ecd7c864c7d44a82.bindPopup(popup_62e04da5e7e756aac3cd38be3f0a0ccc)
+        ;
+
+        
+    
+    
+            circle_marker_480496cac4713370ecd7c864c7d44a82.bindTooltip(
+                `<div>
+                     BANGKOK | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_03b95134c5779a3ca933e5876d9b8f27 = L.circleMarker(
+                [13.698567, 100.583767],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_56a035c978fe88256aa54fd83c26866a = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_e72fac770e64b9b5508245415b7bad35 = $(`<div id="html_e72fac770e64b9b5508245415b7bad35" style="width: 100.0%; height: 100.0%;">stop_id: 29<br>port: BANGKOK<br>duration: 5.99 h<br>r95: 0.011 km<br>dh_std: 0.2°<br>dist_port: 9.52 km</div>`)[0];
+                popup_56a035c978fe88256aa54fd83c26866a.setContent(html_e72fac770e64b9b5508245415b7bad35);
+            
+        
+
+        circle_marker_03b95134c5779a3ca933e5876d9b8f27.bindPopup(popup_56a035c978fe88256aa54fd83c26866a)
+        ;
+
+        
+    
+    
+            circle_marker_03b95134c5779a3ca933e5876d9b8f27.bindTooltip(
+                `<div>
+                     BANGKOK | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_8770cbff7590efa7ea8caf3508d36ba5 = L.circleMarker(
+                [13.064683, 100.8923],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_ddc158caecc01f1ada83e0f22897b25e = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_ea4fc464bd8c33b9cec235245a23afde = $(`<div id="html_ea4fc464bd8c33b9cec235245a23afde" style="width: 100.0%; height: 100.0%;">stop_id: 30<br>port: LAEM CHABANG<br>duration: 8.89 h<br>r95: 0.024 km<br>dh_std: 0.7°<br>dist_port: 0.72 km</div>`)[0];
+                popup_ddc158caecc01f1ada83e0f22897b25e.setContent(html_ea4fc464bd8c33b9cec235245a23afde);
+            
+        
+
+        circle_marker_8770cbff7590efa7ea8caf3508d36ba5.bindPopup(popup_ddc158caecc01f1ada83e0f22897b25e)
+        ;
+
+        
+    
+    
+            circle_marker_8770cbff7590efa7ea8caf3508d36ba5.bindTooltip(
+                `<div>
+                     LAEM CHABANG | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_3e2a76850bb85ee0142e14eb115f1617 = L.circleMarker(
+                [21.675, 108.6416],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_04cca375dfd5a181912e647c12a211d9 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_4abb4ab32a0e18849b032fa187f0f388 = $(`<div id="html_4abb4ab32a0e18849b032fa187f0f388" style="width: 100.0%; height: 100.0%;">stop_id: 31<br>port: QINZHOU<br>duration: 4.63 h<br>r95: 0.031 km<br>dh_std: 0.6°<br>dist_port: 1.07 km</div>`)[0];
+                popup_04cca375dfd5a181912e647c12a211d9.setContent(html_4abb4ab32a0e18849b032fa187f0f388);
+            
+        
+
+        circle_marker_3e2a76850bb85ee0142e14eb115f1617.bindPopup(popup_04cca375dfd5a181912e647c12a211d9)
+        ;
+
+        
+    
+    
+            circle_marker_3e2a76850bb85ee0142e14eb115f1617.bindTooltip(
+                `<div>
+                     QINZHOU | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_de3bfab66ef10455271622cd9959344b = L.circleMarker(
+                [29.46615, 122.693117],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_e267ed4a4dde0fe4805b8e63ab1544ca = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_ec14f45539ac7b7fb3534de66df68029 = $(`<div id="html_ec14f45539ac7b7fb3534de66df68029" style="width: 100.0%; height: 100.0%;">stop_id: 32<br>port: LIUHENG<br>duration: 1.90 h<br>r95: 0.057 km<br>dh_std: 6.2°<br>dist_port: 61.41 km</div>`)[0];
+                popup_e267ed4a4dde0fe4805b8e63ab1544ca.setContent(html_ec14f45539ac7b7fb3534de66df68029);
+            
+        
+
+        circle_marker_de3bfab66ef10455271622cd9959344b.bindPopup(popup_e267ed4a4dde0fe4805b8e63ab1544ca)
+        ;
+
+        
+    
+    
+            circle_marker_de3bfab66ef10455271622cd9959344b.bindTooltip(
+                `<div>
+                     LIUHENG | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_5d1a58f73508b4c4f56f9829aa0d7711 = L.circleMarker(
+                [29.937733, 121.86365850000001],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_098cbd74e9d03ede2022166b61e7cc1c = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_6c5421a3299787eb5af3e637bc8d6683 = $(`<div id="html_6c5421a3299787eb5af3e637bc8d6683" style="width: 100.0%; height: 100.0%;">stop_id: 33<br>port: NINGBO<br>duration: 1.75 h<br>r95: 0.024 km<br>dh_std: 1.1°<br>dist_port: 1.64 km</div>`)[0];
+                popup_098cbd74e9d03ede2022166b61e7cc1c.setContent(html_6c5421a3299787eb5af3e637bc8d6683);
+            
+        
+
+        circle_marker_5d1a58f73508b4c4f56f9829aa0d7711.bindPopup(popup_098cbd74e9d03ede2022166b61e7cc1c)
+        ;
+
+        
+    
+    
+            circle_marker_5d1a58f73508b4c4f56f9829aa0d7711.bindTooltip(
+                `<div>
+                     NINGBO | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_dcad6887daeea3b41873212aa5506ebb = L.circleMarker(
+                [29.937633, 121.863717],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_672d877eb0feafc7ffaa0867cfc27393 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_3fc4be5782102bb2e0bedad950b60115 = $(`<div id="html_3fc4be5782102bb2e0bedad950b60115" style="width: 100.0%; height: 100.0%;">stop_id: 34<br>port: NINGBO<br>duration: 17.86 h<br>r95: 0.028 km<br>dh_std: 0.8°<br>dist_port: 1.64 km</div>`)[0];
+                popup_672d877eb0feafc7ffaa0867cfc27393.setContent(html_3fc4be5782102bb2e0bedad950b60115);
+            
+        
+
+        circle_marker_dcad6887daeea3b41873212aa5506ebb.bindPopup(popup_672d877eb0feafc7ffaa0867cfc27393)
+        ;
+
+        
+    
+    
+            circle_marker_dcad6887daeea3b41873212aa5506ebb.bindTooltip(
+                `<div>
+                     NINGBO | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_674fee6bfeeb250357529dce591e1f05 = L.circleMarker(
+                [31.0238585, 122.95339150000001],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_b9145592bc3b26b06469b2f129035225 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_923816019caa5bca1342c8425a2e54b6 = $(`<div id="html_923816019caa5bca1342c8425a2e54b6" style="width: 100.0%; height: 100.0%;">stop_id: 35<br>port: LUHUASHAN<br>duration: 14.40 h<br>r95: 0.070 km<br>dh_std: 11.3°<br>dist_port: 43.11 km</div>`)[0];
+                popup_b9145592bc3b26b06469b2f129035225.setContent(html_923816019caa5bca1342c8425a2e54b6);
+            
+        
+
+        circle_marker_674fee6bfeeb250357529dce591e1f05.bindPopup(popup_b9145592bc3b26b06469b2f129035225)
+        ;
+
+        
+    
+    
+            circle_marker_674fee6bfeeb250357529dce591e1f05.bindTooltip(
+                `<div>
+                     LUHUASHAN | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_8a2ff0e7839c80535a09fe26232a9ac1 = L.circleMarker(
+                [31.0198915, 122.66345849999999],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_0627cbcf8485ddcb60f8954755197975 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_45be2eef4c6c4984265ddadb1d070b6a = $(`<div id="html_45be2eef4c6c4984265ddadb1d070b6a" style="width: 100.0%; height: 100.0%;">stop_id: 36<br>port: LUHUASHAN<br>duration: 8.15 h<br>r95: 0.249 km<br>dh_std: 58.0°<br>dist_port: 26.95 km</div>`)[0];
+                popup_0627cbcf8485ddcb60f8954755197975.setContent(html_45be2eef4c6c4984265ddadb1d070b6a);
+            
+        
+
+        circle_marker_8a2ff0e7839c80535a09fe26232a9ac1.bindPopup(popup_0627cbcf8485ddcb60f8954755197975)
+        ;
+
+        
+    
+    
+            circle_marker_8a2ff0e7839c80535a09fe26232a9ac1.bindTooltip(
+                `<div>
+                     LUHUASHAN | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_0731fc2de4f08ad2f0916f6ff7a935f7 = L.circleMarker(
+                [31.0224835, 122.6569335],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_8e1a77963e91f44d8265f2cf6c5247d7 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_1a73de27a8f768affc68bccf6d9ad85e = $(`<div id="html_1a73de27a8f768affc68bccf6d9ad85e" style="width: 100.0%; height: 100.0%;">stop_id: 37<br>port: LUHUASHAN<br>duration: 5.25 h<br>r95: 0.274 km<br>dh_std: 62.8°<br>dist_port: 27.10 km</div>`)[0];
+                popup_8e1a77963e91f44d8265f2cf6c5247d7.setContent(html_1a73de27a8f768affc68bccf6d9ad85e);
+            
+        
+
+        circle_marker_0731fc2de4f08ad2f0916f6ff7a935f7.bindPopup(popup_8e1a77963e91f44d8265f2cf6c5247d7)
+        ;
+
+        
+    
+    
+            circle_marker_0731fc2de4f08ad2f0916f6ff7a935f7.bindTooltip(
+                `<div>
+                     LUHUASHAN | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_d469071b4f77e77bd675d55aa67c91c1 = L.circleMarker(
+                [31.019333, 122.65832499999999],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_a44ffdb8c58de5b6d682c3cac84d929b = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_3b86b253d44317e222e0b1ab3ba9e4d2 = $(`<div id="html_3b86b253d44317e222e0b1ab3ba9e4d2" style="width: 100.0%; height: 100.0%;">stop_id: 38<br>port: LUHUASHAN<br>duration: 4.50 h<br>r95: 0.131 km<br>dh_std: 24.1°<br>dist_port: 26.79 km</div>`)[0];
+                popup_a44ffdb8c58de5b6d682c3cac84d929b.setContent(html_3b86b253d44317e222e0b1ab3ba9e4d2);
+            
+        
+
+        circle_marker_d469071b4f77e77bd675d55aa67c91c1.bindPopup(popup_a44ffdb8c58de5b6d682c3cac84d929b)
+        ;
+
+        
+    
+    
+            circle_marker_d469071b4f77e77bd675d55aa67c91c1.bindTooltip(
+                `<div>
+                     LUHUASHAN | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_a63a31c6360b0f0a1939928e34215643 = L.circleMarker(
+                [31.3446, 121.65135],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_5ae7e3d187e3a776f1a3964278f451fa = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_5b884f837f745eff1e26abc6e66ca310 = $(`<div id="html_5b884f837f745eff1e26abc6e66ca310" style="width: 100.0%; height: 100.0%;">stop_id: 39<br>port: SHANGHAI<br>duration: 0.63 h<br>r95: 0.100 km<br>dh_std: 10.9°<br>dist_port: 4.24 km</div>`)[0];
+                popup_5ae7e3d187e3a776f1a3964278f451fa.setContent(html_5b884f837f745eff1e26abc6e66ca310);
+            
+        
+
+        circle_marker_a63a31c6360b0f0a1939928e34215643.bindPopup(popup_5ae7e3d187e3a776f1a3964278f451fa)
+        ;
+
+        
+    
+    
+            circle_marker_a63a31c6360b0f0a1939928e34215643.bindTooltip(
+                `<div>
+                     SHANGHAI | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_0869c0386a8973b9a2d39d0f1c3ae933 = L.circleMarker(
+                [31.338467, 121.653133],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_5fb510842f83b6afa1f947b61bc82f8c = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_d695f40b96b6a31ccc5aeb4d6f60b41a = $(`<div id="html_d695f40b96b6a31ccc5aeb4d6f60b41a" style="width: 100.0%; height: 100.0%;">stop_id: 40<br>port: SHANGHAI<br>duration: 1.65 h<br>r95: 0.047 km<br>dh_std: 1.0°<br>dist_port: 4.79 km</div>`)[0];
+                popup_5fb510842f83b6afa1f947b61bc82f8c.setContent(html_d695f40b96b6a31ccc5aeb4d6f60b41a);
+            
+        
+
+        circle_marker_0869c0386a8973b9a2d39d0f1c3ae933.bindPopup(popup_5fb510842f83b6afa1f947b61bc82f8c)
+        ;
+
+        
+    
+    
+            circle_marker_0869c0386a8973b9a2d39d0f1c3ae933.bindTooltip(
+                `<div>
+                     SHANGHAI | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_1e1c49840f5f3c2cc5a8f259c597203f = L.circleMarker(
+                [31.338467, 121.653117],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_e42f1717521b9ef7dd2e7c10b3804122 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_4be76ce7eb25532a40f1e18fb74f9075 = $(`<div id="html_4be76ce7eb25532a40f1e18fb74f9075" style="width: 100.0%; height: 100.0%;">stop_id: 41<br>port: SHANGHAI<br>duration: 5.60 h<br>r95: 0.035 km<br>dh_std: 0.0°<br>dist_port: 4.79 km</div>`)[0];
+                popup_e42f1717521b9ef7dd2e7c10b3804122.setContent(html_4be76ce7eb25532a40f1e18fb74f9075);
+            
+        
+
+        circle_marker_1e1c49840f5f3c2cc5a8f259c597203f.bindPopup(popup_e42f1717521b9ef7dd2e7c10b3804122)
+        ;
+
+        
+    
+    
+            circle_marker_1e1c49840f5f3c2cc5a8f259c597203f.bindTooltip(
+                `<div>
+                     SHANGHAI | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_6e17d4bd48e63206fda1349cf52e0dc1 = L.circleMarker(
+                [31.338517, 121.6532],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_b528a102edc9f7c6981fe6347e5bb539 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_ecc7df7be7720c3acc6974e2b8c6cb7b = $(`<div id="html_ecc7df7be7720c3acc6974e2b8c6cb7b" style="width: 100.0%; height: 100.0%;">stop_id: 42<br>port: SHANGHAI<br>duration: 2.48 h<br>r95: 0.038 km<br>dh_std: 1.8°<br>dist_port: 4.79 km</div>`)[0];
+                popup_b528a102edc9f7c6981fe6347e5bb539.setContent(html_ecc7df7be7720c3acc6974e2b8c6cb7b);
+            
+        
+
+        circle_marker_6e17d4bd48e63206fda1349cf52e0dc1.bindPopup(popup_b528a102edc9f7c6981fe6347e5bb539)
+        ;
+
+        
+    
+    
+            circle_marker_6e17d4bd48e63206fda1349cf52e0dc1.bindTooltip(
+                `<div>
+                     SHANGHAI | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_8098f7dbfa9ade006c6c61c624c18893 = L.circleMarker(
+                [10.670817, 103.466617],
+                {"bubblingMouseEvents": true, "color": "orange", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "orange", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_32b5f6849a018abdc903bf9ce7474516 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_9f97defdee903cedef3906122a1b713c = $(`<div id="html_9f97defdee903cedef3906122a1b713c" style="width: 100.0%; height: 100.0%;">stop_id: 43<br>port: SIHANOUKVILLE<br>duration: 40.95 h<br>r95: 0.296 km<br>dh_std: 194.6°<br>dist_port: 5.13 km</div>`)[0];
+                popup_32b5f6849a018abdc903bf9ce7474516.setContent(html_9f97defdee903cedef3906122a1b713c);
+            
+        
+
+        circle_marker_8098f7dbfa9ade006c6c61c624c18893.bindPopup(popup_32b5f6849a018abdc903bf9ce7474516)
+        ;
+
+        
+    
+    
+            circle_marker_8098f7dbfa9ade006c6c61c624c18893.bindTooltip(
+                `<div>
+                     SIHANOUKVILLE | anchorage
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_98da93d9cde5e8b3f97ef3fe2e89c546 = L.circleMarker(
+                [10.6481, 103.5103],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_ea65d3e016b7d68b86344c5a313fdd90 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_53eba251b33b96bcc53d6dcc75dcc441 = $(`<div id="html_53eba251b33b96bcc53d6dcc75dcc441" style="width: 100.0%; height: 100.0%;">stop_id: 44<br>port: SIHANOUKVILLE<br>duration: 19.67 h<br>r95: 0.019 km<br>dh_std: 1.0°<br>dist_port: 0.37 km</div>`)[0];
+                popup_ea65d3e016b7d68b86344c5a313fdd90.setContent(html_53eba251b33b96bcc53d6dcc75dcc441);
+            
+        
+
+        circle_marker_98da93d9cde5e8b3f97ef3fe2e89c546.bindPopup(popup_ea65d3e016b7d68b86344c5a313fdd90)
+        ;
+
+        
+    
+    
+            circle_marker_98da93d9cde5e8b3f97ef3fe2e89c546.bindTooltip(
+                `<div>
+                     SIHANOUKVILLE | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_85a9866f70046996f3867b78c1c2c3bd = L.circleMarker(
+                [13.370933, 100.64695],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_bcc41038fc265d1adc035a7abb1ff966 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_b68a37cfc16183188f3435616ee1ca5f = $(`<div id="html_b68a37cfc16183188f3435616ee1ca5f" style="width: 100.0%; height: 100.0%;">stop_id: 45<br>port: BANGKOK<br>duration: 16.95 h<br>r95: 0.050 km<br>dh_std: 13.9°<br>dist_port: 29.36 km</div>`)[0];
+                popup_bcc41038fc265d1adc035a7abb1ff966.setContent(html_b68a37cfc16183188f3435616ee1ca5f);
+            
+        
+
+        circle_marker_85a9866f70046996f3867b78c1c2c3bd.bindPopup(popup_bcc41038fc265d1adc035a7abb1ff966)
+        ;
+
+        
+    
+    
+            circle_marker_85a9866f70046996f3867b78c1c2c3bd.bindTooltip(
+                `<div>
+                     BANGKOK | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_52359996b50a9359d256c1221c2e3541 = L.circleMarker(
+                [13.37095, 100.64675],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_6beec92899cc22b95db943c8c8499934 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_cacea9b0f5f21e0842286e190a131bb9 = $(`<div id="html_cacea9b0f5f21e0842286e190a131bb9" style="width: 100.0%; height: 100.0%;">stop_id: 46<br>port: BANGKOK<br>duration: 1.40 h<br>r95: 0.031 km<br>dh_std: 12.3°<br>dist_port: 29.35 km</div>`)[0];
+                popup_6beec92899cc22b95db943c8c8499934.setContent(html_cacea9b0f5f21e0842286e190a131bb9);
+            
+        
+
+        circle_marker_52359996b50a9359d256c1221c2e3541.bindPopup(popup_6beec92899cc22b95db943c8c8499934)
+        ;
+
+        
+    
+    
+            circle_marker_52359996b50a9359d256c1221c2e3541.bindTooltip(
+                `<div>
+                     BANGKOK | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_bc9c0589ac09054a484f4af1ef6e7ab8 = L.circleMarker(
+                [13.37095, 100.646917],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_d3c2579cf533c83e86cafb75d195ae72 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_f3f8ae047c643ef7856a89779dd05bf0 = $(`<div id="html_f3f8ae047c643ef7856a89779dd05bf0" style="width: 100.0%; height: 100.0%;">stop_id: 47<br>port: BANGKOK<br>duration: 1.20 h<br>r95: 0.041 km<br>dh_std: 15.5°<br>dist_port: 29.36 km</div>`)[0];
+                popup_d3c2579cf533c83e86cafb75d195ae72.setContent(html_f3f8ae047c643ef7856a89779dd05bf0);
+            
+        
+
+        circle_marker_bc9c0589ac09054a484f4af1ef6e7ab8.bindPopup(popup_d3c2579cf533c83e86cafb75d195ae72)
+        ;
+
+        
+    
+    
+            circle_marker_bc9c0589ac09054a484f4af1ef6e7ab8.bindTooltip(
+                `<div>
+                     BANGKOK | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_e65bd6ba7257f9a1a774aba95c30f8aa = L.circleMarker(
+                [13.695933, 100.586183],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_ab6dfe06e54bd165f633c2219cd29973 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_5262b65674cef94c3a304eaf5284d44a = $(`<div id="html_5262b65674cef94c3a304eaf5284d44a" style="width: 100.0%; height: 100.0%;">stop_id: 48<br>port: BANGKOK<br>duration: 11.12 h<br>r95: 0.014 km<br>dh_std: 0.6°<br>dist_port: 9.35 km</div>`)[0];
+                popup_ab6dfe06e54bd165f633c2219cd29973.setContent(html_5262b65674cef94c3a304eaf5284d44a);
+            
+        
+
+        circle_marker_e65bd6ba7257f9a1a774aba95c30f8aa.bindPopup(popup_ab6dfe06e54bd165f633c2219cd29973)
+        ;
+
+        
+    
+    
+            circle_marker_e65bd6ba7257f9a1a774aba95c30f8aa.bindTooltip(
+                `<div>
+                     BANGKOK | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_dc9f5105f5e5b27a15c5e380697c9e1f = L.circleMarker(
+                [13.063817, 100.890833],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_05b47d9aae7139f0afc592afffc190ff = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_72222ece6c528fe19fa350451618153a = $(`<div id="html_72222ece6c528fe19fa350451618153a" style="width: 100.0%; height: 100.0%;">stop_id: 49<br>port: LAEM CHABANG<br>duration: 16.22 h<br>r95: 0.018 km<br>dh_std: 0.6°<br>dist_port: 0.71 km</div>`)[0];
+                popup_05b47d9aae7139f0afc592afffc190ff.setContent(html_72222ece6c528fe19fa350451618153a);
+            
+        
+
+        circle_marker_dc9f5105f5e5b27a15c5e380697c9e1f.bindPopup(popup_05b47d9aae7139f0afc592afffc190ff)
+        ;
+
+        
+    
+    
+            circle_marker_dc9f5105f5e5b27a15c5e380697c9e1f.bindTooltip(
+                `<div>
+                     LAEM CHABANG | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_54b21b28b465708b68e8812e0c4813c5 = L.circleMarker(
+                [21.6823, 108.63595],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_d8f0f3691f90b9ed40a5a738f4f336a3 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_ccb55fc8eb1fd3c9aa3f4969efb1b0ef = $(`<div id="html_ccb55fc8eb1fd3c9aa3f4969efb1b0ef" style="width: 100.0%; height: 100.0%;">stop_id: 50<br>port: QINZHOU<br>duration: 5.71 h<br>r95: 0.029 km<br>dh_std: 0.4°<br>dist_port: 1.15 km</div>`)[0];
+                popup_d8f0f3691f90b9ed40a5a738f4f336a3.setContent(html_ccb55fc8eb1fd3c9aa3f4969efb1b0ef);
+            
+        
+
+        circle_marker_54b21b28b465708b68e8812e0c4813c5.bindPopup(popup_d8f0f3691f90b9ed40a5a738f4f336a3)
+        ;
+
+        
+    
+    
+            circle_marker_54b21b28b465708b68e8812e0c4813c5.bindTooltip(
+                `<div>
+                     QINZHOU | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_b192d8570d2a2d9d6763e754d7193200 = L.circleMarker(
+                [29.935283, 121.870883],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_c1e8cf9e5edb5adc4932370354b3e206 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_5c6835303799ad2b201bf1e7f2d9ef5a = $(`<div id="html_5c6835303799ad2b201bf1e7f2d9ef5a" style="width: 100.0%; height: 100.0%;">stop_id: 51<br>port: NINGBO<br>duration: 19.64 h<br>r95: 0.024 km<br>dh_std: 1.1°<br>dist_port: 2.02 km</div>`)[0];
+                popup_c1e8cf9e5edb5adc4932370354b3e206.setContent(html_5c6835303799ad2b201bf1e7f2d9ef5a);
+            
+        
+
+        circle_marker_b192d8570d2a2d9d6763e754d7193200.bindPopup(popup_c1e8cf9e5edb5adc4932370354b3e206)
+        ;
+
+        
+    
+    
+            circle_marker_b192d8570d2a2d9d6763e754d7193200.bindTooltip(
+                `<div>
+                     NINGBO | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_5456ff19b9f7719563220b6ca5346604 = L.circleMarker(
+                [31.0145915, 122.60325850000001],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_c729613f0d7919965083673300663d54 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_88037a09b3e5585a05a14bfb7cd79acf = $(`<div id="html_88037a09b3e5585a05a14bfb7cd79acf" style="width: 100.0%; height: 100.0%;">stop_id: 52<br>port: LUHUASHAN<br>duration: 8.00 h<br>r95: 0.294 km<br>dh_std: 56.8°<br>dist_port: 25.64 km</div>`)[0];
+                popup_c729613f0d7919965083673300663d54.setContent(html_88037a09b3e5585a05a14bfb7cd79acf);
+            
+        
+
+        circle_marker_5456ff19b9f7719563220b6ca5346604.bindPopup(popup_c729613f0d7919965083673300663d54)
+        ;
+
+        
+    
+    
+            circle_marker_5456ff19b9f7719563220b6ca5346604.bindTooltip(
+                `<div>
+                     LUHUASHAN | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_38bca9dc52216ebb4ff91cbc6c2a6291 = L.circleMarker(
+                [31.01115, 122.601767],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_8342c9bdfd7de4cb7af43a9e2d59a79c = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_758d31af0af62f2332240af16f7e07ed = $(`<div id="html_758d31af0af62f2332240af16f7e07ed" style="width: 100.0%; height: 100.0%;">stop_id: 53<br>port: LUHUASHAN<br>duration: 2.00 h<br>r95: 0.121 km<br>dh_std: 19.3°<br>dist_port: 25.26 km</div>`)[0];
+                popup_8342c9bdfd7de4cb7af43a9e2d59a79c.setContent(html_758d31af0af62f2332240af16f7e07ed);
+            
+        
+
+        circle_marker_38bca9dc52216ebb4ff91cbc6c2a6291.bindPopup(popup_8342c9bdfd7de4cb7af43a9e2d59a79c)
+        ;
+
+        
+    
+    
+            circle_marker_38bca9dc52216ebb4ff91cbc6c2a6291.bindTooltip(
+                `<div>
+                     LUHUASHAN | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_938c2486c324b64dcef90e3d4a0eef0c = L.circleMarker(
+                [31.33815, 121.65375],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_9cb4fb534384f1d6ca2f65f98923ae70 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_f4b88f40b6e372878e3909498f1ad2b5 = $(`<div id="html_f4b88f40b6e372878e3909498f1ad2b5" style="width: 100.0%; height: 100.0%;">stop_id: 54<br>port: SHANGHAI<br>duration: 4.18 h<br>r95: 0.022 km<br>dh_std: 0.9°<br>dist_port: 4.86 km</div>`)[0];
+                popup_9cb4fb534384f1d6ca2f65f98923ae70.setContent(html_f4b88f40b6e372878e3909498f1ad2b5);
+            
+        
+
+        circle_marker_938c2486c324b64dcef90e3d4a0eef0c.bindPopup(popup_9cb4fb534384f1d6ca2f65f98923ae70)
+        ;
+
+        
+    
+    
+            circle_marker_938c2486c324b64dcef90e3d4a0eef0c.bindTooltip(
+                `<div>
+                     SHANGHAI | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_2602f2f5ad7c11a2f32f1f2021abad64 = L.circleMarker(
+                [31.33815, 121.653717],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_ad63a322168493d105b72336758de5b2 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_a0e72315e0495c5a3585bd3e06a846e9 = $(`<div id="html_a0e72315e0495c5a3585bd3e06a846e9" style="width: 100.0%; height: 100.0%;">stop_id: 55<br>port: SHANGHAI<br>duration: 6.76 h<br>r95: 0.044 km<br>dh_std: 0.4°<br>dist_port: 4.85 km</div>`)[0];
+                popup_ad63a322168493d105b72336758de5b2.setContent(html_a0e72315e0495c5a3585bd3e06a846e9);
+            
+        
+
+        circle_marker_2602f2f5ad7c11a2f32f1f2021abad64.bindPopup(popup_ad63a322168493d105b72336758de5b2)
+        ;
+
+        
+    
+    
+            circle_marker_2602f2f5ad7c11a2f32f1f2021abad64.bindTooltip(
+                `<div>
+                     SHANGHAI | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_d1c157cc933b5b2572fca7c4d2ca79da = L.circleMarker(
+                [10.670533, 103.46665],
+                {"bubblingMouseEvents": true, "color": "orange", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "orange", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_d7a94566e621198c645e85794ec954e6 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_9c90ed0361269baca28008af11350b8c = $(`<div id="html_9c90ed0361269baca28008af11350b8c" style="width: 100.0%; height: 100.0%;">stop_id: 56<br>port: SIHANOUKVILLE<br>duration: 11.85 h<br>r95: 0.142 km<br>dh_std: 26.6°<br>dist_port: 5.11 km</div>`)[0];
+                popup_d7a94566e621198c645e85794ec954e6.setContent(html_9c90ed0361269baca28008af11350b8c);
+            
+        
+
+        circle_marker_d1c157cc933b5b2572fca7c4d2ca79da.bindPopup(popup_d7a94566e621198c645e85794ec954e6)
+        ;
+
+        
+    
+    
+            circle_marker_d1c157cc933b5b2572fca7c4d2ca79da.bindTooltip(
+                `<div>
+                     SIHANOUKVILLE | anchorage
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_336265060c1e6159793374df506f35e2 = L.circleMarker(
+                [10.667817, 103.46645],
+                {"bubblingMouseEvents": true, "color": "orange", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "orange", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_6743f87c393f7f2f58bd58e4b19b65da = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_5262bd6839707c31ba9a20fae99ccb94 = $(`<div id="html_5262bd6839707c31ba9a20fae99ccb94" style="width: 100.0%; height: 100.0%;">stop_id: 57<br>port: SIHANOUKVILLE<br>duration: 14.14 h<br>r95: 0.291 km<br>dh_std: 83.7°<br>dist_port: 4.99 km</div>`)[0];
+                popup_6743f87c393f7f2f58bd58e4b19b65da.setContent(html_5262bd6839707c31ba9a20fae99ccb94);
+            
+        
+
+        circle_marker_336265060c1e6159793374df506f35e2.bindPopup(popup_6743f87c393f7f2f58bd58e4b19b65da)
+        ;
+
+        
+    
+    
+            circle_marker_336265060c1e6159793374df506f35e2.bindTooltip(
+                `<div>
+                     SIHANOUKVILLE | anchorage
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_9c5a527f2b6aa8d26507df71eac8c781 = L.circleMarker(
+                [10.648683, 103.51205],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_bef8ec417b91bc9d017ea602d169fab5 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_1e84edb84632ecf81a9813eb8eec538a = $(`<div id="html_1e84edb84632ecf81a9813eb8eec538a" style="width: 100.0%; height: 100.0%;">stop_id: 58<br>port: SIHANOUKVILLE<br>duration: 23.86 h<br>r95: 0.020 km<br>dh_std: 0.6°<br>dist_port: 0.57 km</div>`)[0];
+                popup_bef8ec417b91bc9d017ea602d169fab5.setContent(html_1e84edb84632ecf81a9813eb8eec538a);
+            
+        
+
+        circle_marker_9c5a527f2b6aa8d26507df71eac8c781.bindPopup(popup_bef8ec417b91bc9d017ea602d169fab5)
+        ;
+
+        
+    
+    
+            circle_marker_9c5a527f2b6aa8d26507df71eac8c781.bindTooltip(
+                `<div>
+                     SIHANOUKVILLE | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_fe432e10c108a5c940e0ec6f6f3a68b0 = L.circleMarker(
+                [13.06465, 100.892317],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_d8c6de83d0aa80fedecdbfe0415d9448 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_b43578ee5a216a8f939a5a30caaea3ed = $(`<div id="html_b43578ee5a216a8f939a5a30caaea3ed" style="width: 100.0%; height: 100.0%;">stop_id: 59<br>port: LAEM CHABANG<br>duration: 18.99 h<br>r95: 0.016 km<br>dh_std: 0.5°<br>dist_port: 0.71 km</div>`)[0];
+                popup_d8c6de83d0aa80fedecdbfe0415d9448.setContent(html_b43578ee5a216a8f939a5a30caaea3ed);
+            
+        
+
+        circle_marker_fe432e10c108a5c940e0ec6f6f3a68b0.bindPopup(popup_d8c6de83d0aa80fedecdbfe0415d9448)
+        ;
+
+        
+    
+    
+            circle_marker_fe432e10c108a5c940e0ec6f6f3a68b0.bindTooltip(
+                `<div>
+                     LAEM CHABANG | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_e806300c2b4c6d0ad92c0d2172bdbb9f = L.circleMarker(
+                [22.646967, 113.681717],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_6f5b9789df4548b3083935929e4a0f5a = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_a97a3f39bae0bc31b305d2ce73b9a16c = $(`<div id="html_a97a3f39bae0bc31b305d2ce73b9a16c" style="width: 100.0%; height: 100.0%;">stop_id: 60<br>port: NANSHA<br>duration: 5.29 h<br>r95: 0.023 km<br>dh_std: 0.8°<br>dist_port: 3.29 km</div>`)[0];
+                popup_6f5b9789df4548b3083935929e4a0f5a.setContent(html_a97a3f39bae0bc31b305d2ce73b9a16c);
+            
+        
+
+        circle_marker_e806300c2b4c6d0ad92c0d2172bdbb9f.bindPopup(popup_6f5b9789df4548b3083935929e4a0f5a)
+        ;
+
+        
+    
+    
+            circle_marker_e806300c2b4c6d0ad92c0d2172bdbb9f.bindTooltip(
+                `<div>
+                     NANSHA | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_cc28e4195a2734953d8aaee020c2970f = L.circleMarker(
+                [29.935417, 121.870017],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_de481cc19f40008356036fbab740691f = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_ce69d809a30507351547d046996932ef = $(`<div id="html_ce69d809a30507351547d046996932ef" style="width: 100.0%; height: 100.0%;">stop_id: 61<br>port: NINGBO<br>duration: 18.41 h<br>r95: 0.041 km<br>dh_std: 0.4°<br>dist_port: 1.96 km</div>`)[0];
+                popup_de481cc19f40008356036fbab740691f.setContent(html_ce69d809a30507351547d046996932ef);
+            
+        
+
+        circle_marker_cc28e4195a2734953d8aaee020c2970f.bindPopup(popup_de481cc19f40008356036fbab740691f)
+        ;
+
+        
+    
+    
+            circle_marker_cc28e4195a2734953d8aaee020c2970f.bindTooltip(
+                `<div>
+                     NINGBO | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_3bbfb946b108d261a97ab430cf7d86e6 = L.circleMarker(
+                [29.935417, 121.87],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_d2f6909d5998e6ed4db86869d821a6d4 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_340da101145c0e9017268afbecca5d62 = $(`<div id="html_340da101145c0e9017268afbecca5d62" style="width: 100.0%; height: 100.0%;">stop_id: 62<br>port: NINGBO<br>duration: 2.95 h<br>r95: 0.022 km<br>dh_std: 0.2°<br>dist_port: 1.95 km</div>`)[0];
+                popup_d2f6909d5998e6ed4db86869d821a6d4.setContent(html_340da101145c0e9017268afbecca5d62);
+            
+        
+
+        circle_marker_3bbfb946b108d261a97ab430cf7d86e6.bindPopup(popup_d2f6909d5998e6ed4db86869d821a6d4)
+        ;
+
+        
+    
+    
+            circle_marker_3bbfb946b108d261a97ab430cf7d86e6.bindTooltip(
+                `<div>
+                     NINGBO | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_de241d797344bdf8cfd34a543e249b70 = L.circleMarker(
+                [31.137383, 122.7283],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_6d2a65aa5fe62cc4689b46e20ca29edc = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_eb3341bc0c7f0fd479c6faa367233b75 = $(`<div id="html_eb3341bc0c7f0fd479c6faa367233b75" style="width: 100.0%; height: 100.0%;">stop_id: 63<br>port: LUHUASHAN<br>duration: 2.95 h<br>r95: 0.098 km<br>dh_std: 10.7°<br>dist_port: 41.20 km</div>`)[0];
+                popup_6d2a65aa5fe62cc4689b46e20ca29edc.setContent(html_eb3341bc0c7f0fd479c6faa367233b75);
+            
+        
+
+        circle_marker_de241d797344bdf8cfd34a543e249b70.bindPopup(popup_6d2a65aa5fe62cc4689b46e20ca29edc)
+        ;
+
+        
+    
+    
+            circle_marker_de241d797344bdf8cfd34a543e249b70.bindTooltip(
+                `<div>
+                     LUHUASHAN | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_9c5352a0df8d200fcb5507bab2e146ac = L.circleMarker(
+                [31.338183, 121.65375],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_57c5828cbc0566600517c8dcaa4b49cb = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_2616a9b1ca97ee7fbe41f3d8195ce277 = $(`<div id="html_2616a9b1ca97ee7fbe41f3d8195ce277" style="width: 100.0%; height: 100.0%;">stop_id: 64<br>port: SHANGHAI<br>duration: 9.01 h<br>r95: 0.037 km<br>dh_std: 0.9°<br>dist_port: 4.85 km</div>`)[0];
+                popup_57c5828cbc0566600517c8dcaa4b49cb.setContent(html_2616a9b1ca97ee7fbe41f3d8195ce277);
+            
+        
+
+        circle_marker_9c5352a0df8d200fcb5507bab2e146ac.bindPopup(popup_57c5828cbc0566600517c8dcaa4b49cb)
+        ;
+
+        
+    
+    
+            circle_marker_9c5352a0df8d200fcb5507bab2e146ac.bindTooltip(
+                `<div>
+                     SHANGHAI | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_828dc5aa6e36b8c2f9e78217494bcfd9 = L.circleMarker(
+                [31.3381585, 121.65375],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_3ce1853fd214264dec18d9131261ed50 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_080e6de826eb0581e78ef7e96dfafe3c = $(`<div id="html_080e6de826eb0581e78ef7e96dfafe3c" style="width: 100.0%; height: 100.0%;">stop_id: 65<br>port: SHANGHAI<br>duration: 1.70 h<br>r95: 0.023 km<br>dh_std: 0.0°<br>dist_port: 4.86 km</div>`)[0];
+                popup_3ce1853fd214264dec18d9131261ed50.setContent(html_080e6de826eb0581e78ef7e96dfafe3c);
+            
+        
+
+        circle_marker_828dc5aa6e36b8c2f9e78217494bcfd9.bindPopup(popup_3ce1853fd214264dec18d9131261ed50)
+        ;
+
+        
+    
+    
+            circle_marker_828dc5aa6e36b8c2f9e78217494bcfd9.bindTooltip(
+                `<div>
+                     SHANGHAI | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_023156cdde2805b759d04ce69b9cbe00 = L.circleMarker(
+                [10.671517, 103.461117],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_965c59fbd7e53b6ff530a51ad2c4fed6 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_6421c5ea35e07c2b0a4c4c95972edb5f = $(`<div id="html_6421c5ea35e07c2b0a4c4c95972edb5f" style="width: 100.0%; height: 100.0%;">stop_id: 66<br>port: SIHANOUKVILLE<br>duration: 3.00 h<br>r95: 0.068 km<br>dh_std: 7.9°<br>dist_port: 5.69 km</div>`)[0];
+                popup_965c59fbd7e53b6ff530a51ad2c4fed6.setContent(html_6421c5ea35e07c2b0a4c4c95972edb5f);
+            
+        
+
+        circle_marker_023156cdde2805b759d04ce69b9cbe00.bindPopup(popup_965c59fbd7e53b6ff530a51ad2c4fed6)
+        ;
+
+        
+    
+    
+            circle_marker_023156cdde2805b759d04ce69b9cbe00.bindTooltip(
+                `<div>
+                     SIHANOUKVILLE | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_2194a62c0381ba27cfa4152ce9a5623c = L.circleMarker(
+                [10.6481, 103.51025],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_5e735c88942dea1e2320658c57afde68 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_4fc87b8e7090bbe2d76ba4a22d496b84 = $(`<div id="html_4fc87b8e7090bbe2d76ba4a22d496b84" style="width: 100.0%; height: 100.0%;">stop_id: 67<br>port: SIHANOUKVILLE<br>duration: 18.69 h<br>r95: 0.035 km<br>dh_std: 1.3°<br>dist_port: 0.37 km</div>`)[0];
+                popup_5e735c88942dea1e2320658c57afde68.setContent(html_4fc87b8e7090bbe2d76ba4a22d496b84);
+            
+        
+
+        circle_marker_2194a62c0381ba27cfa4152ce9a5623c.bindPopup(popup_5e735c88942dea1e2320658c57afde68)
+        ;
+
+        
+    
+    
+            circle_marker_2194a62c0381ba27cfa4152ce9a5623c.bindTooltip(
+                `<div>
+                     SIHANOUKVILLE | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_53329b3bff65e3e92c68a2bca2de7694 = L.circleMarker(
+                [13.361017, 100.62739149999999],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_17ef733e0e46626353600af682f51a05 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_c3fad20162c4c04866fafd0a5fd9348c = $(`<div id="html_c3fad20162c4c04866fafd0a5fd9348c" style="width: 100.0%; height: 100.0%;">stop_id: 68<br>port: BANGKOK<br>duration: 17.20 h<br>r95: 0.128 km<br>dh_std: 29.7°<br>dist_port: 29.75 km</div>`)[0];
+                popup_17ef733e0e46626353600af682f51a05.setContent(html_c3fad20162c4c04866fafd0a5fd9348c);
+            
+        
+
+        circle_marker_53329b3bff65e3e92c68a2bca2de7694.bindPopup(popup_17ef733e0e46626353600af682f51a05)
+        ;
+
+        
+    
+    
+            circle_marker_53329b3bff65e3e92c68a2bca2de7694.bindTooltip(
+                `<div>
+                     BANGKOK | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_b6ec38f2ac590280f66307bcb0a4eb97 = L.circleMarker(
+                [13.360717, 100.6276915],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_cafe1e6ec302bfa83188bb5c3f9660a9 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_11e8cec23df15c0b0876abaf155fa479 = $(`<div id="html_11e8cec23df15c0b0876abaf155fa479" style="width: 100.0%; height: 100.0%;">stop_id: 69<br>port: BANGKOK<br>duration: 14.05 h<br>r95: 0.137 km<br>dh_std: 22.6°<br>dist_port: 29.79 km</div>`)[0];
+                popup_cafe1e6ec302bfa83188bb5c3f9660a9.setContent(html_11e8cec23df15c0b0876abaf155fa479);
+            
+        
+
+        circle_marker_b6ec38f2ac590280f66307bcb0a4eb97.bindPopup(popup_cafe1e6ec302bfa83188bb5c3f9660a9)
+        ;
+
+        
+    
+    
+            circle_marker_b6ec38f2ac590280f66307bcb0a4eb97.bindTooltip(
+                `<div>
+                     BANGKOK | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_3ed8428737905022b0e27fa2c7e786a0 = L.circleMarker(
+                [13.3605165, 100.627775],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_93432634cf7c3ab83365128554a99d95 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_2ccf0ca2f33365df2369130828fe1795 = $(`<div id="html_2ccf0ca2f33365df2369130828fe1795" style="width: 100.0%; height: 100.0%;">stop_id: 70<br>port: BANGKOK<br>duration: 2.25 h<br>r95: 0.040 km<br>dh_std: 9.9°<br>dist_port: 29.82 km</div>`)[0];
+                popup_93432634cf7c3ab83365128554a99d95.setContent(html_2ccf0ca2f33365df2369130828fe1795);
+            
+        
+
+        circle_marker_3ed8428737905022b0e27fa2c7e786a0.bindPopup(popup_93432634cf7c3ab83365128554a99d95)
+        ;
+
+        
+    
+    
+            circle_marker_3ed8428737905022b0e27fa2c7e786a0.bindTooltip(
+                `<div>
+                     BANGKOK | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_a31f362c4443a865dce76675e3b91108 = L.circleMarker(
+                [13.360933, 100.627583],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_2fb3a95afe5f773a44f20f95963d2f38 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_156b39f6d16065e7eece98ba350a2ad7 = $(`<div id="html_156b39f6d16065e7eece98ba350a2ad7" style="width: 100.0%; height: 100.0%;">stop_id: 71<br>port: BANGKOK<br>duration: 5.25 h<br>r95: 0.079 km<br>dh_std: 19.0°<br>dist_port: 29.77 km</div>`)[0];
+                popup_2fb3a95afe5f773a44f20f95963d2f38.setContent(html_156b39f6d16065e7eece98ba350a2ad7);
+            
+        
+
+        circle_marker_a31f362c4443a865dce76675e3b91108.bindPopup(popup_2fb3a95afe5f773a44f20f95963d2f38)
+        ;
+
+        
+    
+    
+            circle_marker_a31f362c4443a865dce76675e3b91108.bindTooltip(
+                `<div>
+                     BANGKOK | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_a7c321511a4df55338d5af092a12c827 = L.circleMarker(
+                [13.69595, 100.586183],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_f0778ff2367b7005f9da2d3f70e97136 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_b495321ec196dc8d8ad3a2fbc528e4aa = $(`<div id="html_b495321ec196dc8d8ad3a2fbc528e4aa" style="width: 100.0%; height: 100.0%;">stop_id: 72<br>port: BANGKOK<br>duration: 20.61 h<br>r95: 0.014 km<br>dh_std: 0.7°<br>dist_port: 9.35 km</div>`)[0];
+                popup_f0778ff2367b7005f9da2d3f70e97136.setContent(html_b495321ec196dc8d8ad3a2fbc528e4aa);
+            
+        
+
+        circle_marker_a7c321511a4df55338d5af092a12c827.bindPopup(popup_f0778ff2367b7005f9da2d3f70e97136)
+        ;
+
+        
+    
+    
+            circle_marker_a7c321511a4df55338d5af092a12c827.bindTooltip(
+                `<div>
+                     BANGKOK | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_4da1563d88c38ee50a14a6f278ed5499 = L.circleMarker(
+                [13.064467, 100.89195],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_3035f82628875c6e485e8b13f6e2d30f = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_c571db3b51f797b6dc92139ae83e5107 = $(`<div id="html_c571db3b51f797b6dc92139ae83e5107" style="width: 100.0%; height: 100.0%;">stop_id: 73<br>port: LAEM CHABANG<br>duration: 10.52 h<br>r95: 0.021 km<br>dh_std: 0.8°<br>dist_port: 0.71 km</div>`)[0];
+                popup_3035f82628875c6e485e8b13f6e2d30f.setContent(html_c571db3b51f797b6dc92139ae83e5107);
+            
+        
+
+        circle_marker_4da1563d88c38ee50a14a6f278ed5499.bindPopup(popup_3035f82628875c6e485e8b13f6e2d30f)
+        ;
+
+        
+    
+    
+            circle_marker_4da1563d88c38ee50a14a6f278ed5499.bindTooltip(
+                `<div>
+                     LAEM CHABANG | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_ca40e5f34254ae4f8aa31591926bef6f = L.circleMarker(
+                [21.666, 108.64835],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_378140c6e99d7049683c7c84611d4b35 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_0e66be4c95d391796655f8227ace46f2 = $(`<div id="html_0e66be4c95d391796655f8227ace46f2" style="width: 100.0%; height: 100.0%;">stop_id: 74<br>port: QINZHOU<br>duration: 7.42 h<br>r95: 0.090 km<br>dh_std: 3.1°<br>dist_port: 1.91 km</div>`)[0];
+                popup_378140c6e99d7049683c7c84611d4b35.setContent(html_0e66be4c95d391796655f8227ace46f2);
+            
+        
+
+        circle_marker_ca40e5f34254ae4f8aa31591926bef6f.bindPopup(popup_378140c6e99d7049683c7c84611d4b35)
+        ;
+
+        
+    
+    
+            circle_marker_ca40e5f34254ae4f8aa31591926bef6f.bindTooltip(
+                `<div>
+                     QINZHOU | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_34a0d7079ec75bfff8cc2d66d631c829 = L.circleMarker(
+                [29.935317, 121.870733],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_601ff674accdf6af58997c0bd876f221 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_d45970be8966e809a88c75a56ea22364 = $(`<div id="html_d45970be8966e809a88c75a56ea22364" style="width: 100.0%; height: 100.0%;">stop_id: 75<br>port: NINGBO<br>duration: 20.29 h<br>r95: 0.025 km<br>dh_std: 0.5°<br>dist_port: 2.01 km</div>`)[0];
+                popup_601ff674accdf6af58997c0bd876f221.setContent(html_d45970be8966e809a88c75a56ea22364);
+            
+        
+
+        circle_marker_34a0d7079ec75bfff8cc2d66d631c829.bindPopup(popup_601ff674accdf6af58997c0bd876f221)
+        ;
+
+        
+    
+    
+            circle_marker_34a0d7079ec75bfff8cc2d66d631c829.bindTooltip(
+                `<div>
+                     NINGBO | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_00977d324dbbfd571dd677c6b2847cb0 = L.circleMarker(
+                [31.194875, 122.745475],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_c6402faea8630687fffbb580a84e31c8 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_4041cb51e37b3ca65baf0783f603e205 = $(`<div id="html_4041cb51e37b3ca65baf0783f603e205" style="width: 100.0%; height: 100.0%;">stop_id: 76<br>port: LUHUASHAN<br>duration: 7.05 h<br>r95: 0.232 km<br>dh_std: 27.3°<br>dist_port: 47.79 km</div>`)[0];
+                popup_c6402faea8630687fffbb580a84e31c8.setContent(html_4041cb51e37b3ca65baf0783f603e205);
+            
+        
+
+        circle_marker_00977d324dbbfd571dd677c6b2847cb0.bindPopup(popup_c6402faea8630687fffbb580a84e31c8)
+        ;
+
+        
+    
+    
+            circle_marker_00977d324dbbfd571dd677c6b2847cb0.bindTooltip(
+                `<div>
+                     LUHUASHAN | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_83b9d59cd8178970e4f2a63d83288ef5 = L.circleMarker(
+                [31.19225, 122.745083],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_8a3298b36c9c6df7a5f72f7361a9fb90 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_22d7f8a30d08f780a47e30e67fd82576 = $(`<div id="html_22d7f8a30d08f780a47e30e67fd82576" style="width: 100.0%; height: 100.0%;">stop_id: 77<br>port: LUHUASHAN<br>duration: 1.00 h<br>r95: 0.234 km<br>dh_std: 19.9°<br>dist_port: 47.50 km</div>`)[0];
+                popup_8a3298b36c9c6df7a5f72f7361a9fb90.setContent(html_22d7f8a30d08f780a47e30e67fd82576);
+            
+        
+
+        circle_marker_83b9d59cd8178970e4f2a63d83288ef5.bindPopup(popup_8a3298b36c9c6df7a5f72f7361a9fb90)
+        ;
+
+        
+    
+    
+            circle_marker_83b9d59cd8178970e4f2a63d83288ef5.bindTooltip(
+                `<div>
+                     LUHUASHAN | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_9c72fd252c93426cf7d44dad92733b5f = L.circleMarker(
+                [31.195917, 122.742883],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_b9d52d59d97f69d204ca98fd5a7c1070 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_9058d9b4005b5f7e4707458350a08cf1 = $(`<div id="html_9058d9b4005b5f7e4707458350a08cf1" style="width: 100.0%; height: 100.0%;">stop_id: 78<br>port: LUHUASHAN<br>duration: 4.75 h<br>r95: 0.120 km<br>dh_std: 10.4°<br>dist_port: 47.83 km</div>`)[0];
+                popup_b9d52d59d97f69d204ca98fd5a7c1070.setContent(html_9058d9b4005b5f7e4707458350a08cf1);
+            
+        
+
+        circle_marker_9c72fd252c93426cf7d44dad92733b5f.bindPopup(popup_b9d52d59d97f69d204ca98fd5a7c1070)
+        ;
+
+        
+    
+    
+            circle_marker_9c72fd252c93426cf7d44dad92733b5f.bindTooltip(
+                `<div>
+                     LUHUASHAN | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_9f57e0895efd25e5e6fe6263dec2e240 = L.circleMarker(
+                [31.1954335, 122.7449915],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_faecb7a58747934be743a88d2a012f7f = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_5007bb7a0b308d2a8a302fbedfc47a8d = $(`<div id="html_5007bb7a0b308d2a8a302fbedfc47a8d" style="width: 100.0%; height: 100.0%;">stop_id: 79<br>port: LUHUASHAN<br>duration: 0.75 h<br>r95: 0.037 km<br>dh_std: 10.4°<br>dist_port: 47.84 km</div>`)[0];
+                popup_faecb7a58747934be743a88d2a012f7f.setContent(html_5007bb7a0b308d2a8a302fbedfc47a8d);
+            
+        
+
+        circle_marker_9f57e0895efd25e5e6fe6263dec2e240.bindPopup(popup_faecb7a58747934be743a88d2a012f7f)
+        ;
+
+        
+    
+    
+            circle_marker_9f57e0895efd25e5e6fe6263dec2e240.bindTooltip(
+                `<div>
+                     LUHUASHAN | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_10506bf8bd072a972e43a6898d166693 = L.circleMarker(
+                [31.33795, 121.65455],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_72ddb59f361f257b9527a8279ff27bec = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_f486de1001290bde214186ae40386905 = $(`<div id="html_f486de1001290bde214186ae40386905" style="width: 100.0%; height: 100.0%;">stop_id: 80<br>port: SHANGHAI<br>duration: 3.94 h<br>r95: 0.024 km<br>dh_std: 0.7°<br>dist_port: 4.93 km</div>`)[0];
+                popup_72ddb59f361f257b9527a8279ff27bec.setContent(html_f486de1001290bde214186ae40386905);
+            
+        
+
+        circle_marker_10506bf8bd072a972e43a6898d166693.bindPopup(popup_72ddb59f361f257b9527a8279ff27bec)
+        ;
+
+        
+    
+    
+            circle_marker_10506bf8bd072a972e43a6898d166693.bindTooltip(
+                `<div>
+                     SHANGHAI | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_3703aeaeb510ee4c60f8d1cbfdc99adb = L.circleMarker(
+                [31.3379, 121.654583],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_7ec28ea8e405b08f6e02d1bd01717b44 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_337418933dc0ec3a06ef1d5edc581497 = $(`<div id="html_337418933dc0ec3a06ef1d5edc581497" style="width: 100.0%; height: 100.0%;">stop_id: 81<br>port: SHANGHAI<br>duration: 7.25 h<br>r95: 0.029 km<br>dh_std: 0.0°<br>dist_port: 4.94 km</div>`)[0];
+                popup_7ec28ea8e405b08f6e02d1bd01717b44.setContent(html_337418933dc0ec3a06ef1d5edc581497);
+            
+        
+
+        circle_marker_3703aeaeb510ee4c60f8d1cbfdc99adb.bindPopup(popup_7ec28ea8e405b08f6e02d1bd01717b44)
+        ;
+
+        
+    
+    
+            circle_marker_3703aeaeb510ee4c60f8d1cbfdc99adb.bindTooltip(
+                `<div>
+                     SHANGHAI | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_861f7b725847c7fe02c756c97907177c = L.circleMarker(
+                [31.0289, 122.986383],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_9a71d76c551701a5b9c50dfb8d91fc04 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_b02a6b2d5c8f0863218702c4b79dc3f0 = $(`<div id="html_b02a6b2d5c8f0863218702c4b79dc3f0" style="width: 100.0%; height: 100.0%;">stop_id: 82<br>port: LUHUASHAN<br>duration: 0.85 h<br>r95: 0.092 km<br>dh_std: 22.1°<br>dist_port: 45.95 km</div>`)[0];
+                popup_9a71d76c551701a5b9c50dfb8d91fc04.setContent(html_b02a6b2d5c8f0863218702c4b79dc3f0);
+            
+        
+
+        circle_marker_861f7b725847c7fe02c756c97907177c.bindPopup(popup_9a71d76c551701a5b9c50dfb8d91fc04)
+        ;
+
+        
+    
+    
+            circle_marker_861f7b725847c7fe02c756c97907177c.bindTooltip(
+                `<div>
+                     LUHUASHAN | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_3e1ccaf636000417d98d02d112cdab47 = L.circleMarker(
+                [31.031767, 122.985083],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_1a85c55a36786c120ed2f30391910f3d = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_7348c6907af1268e282adfba108b1efc = $(`<div id="html_7348c6907af1268e282adfba108b1efc" style="width: 100.0%; height: 100.0%;">stop_id: 83<br>port: LUHUASHAN<br>duration: 0.55 h<br>r95: 0.056 km<br>dh_std: 8.8°<br>dist_port: 46.04 km</div>`)[0];
+                popup_1a85c55a36786c120ed2f30391910f3d.setContent(html_7348c6907af1268e282adfba108b1efc);
+            
+        
+
+        circle_marker_3e1ccaf636000417d98d02d112cdab47.bindPopup(popup_1a85c55a36786c120ed2f30391910f3d)
+        ;
+
+        
+    
+    
+            circle_marker_3e1ccaf636000417d98d02d112cdab47.bindTooltip(
+                `<div>
+                     LUHUASHAN | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_7bf1e5a63b2c7a74c20574ca8c3acfa3 = L.circleMarker(
+                [31.340317, 121.6492],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_4dabb3c98cbe4ef19e87a4d7cf415917 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_dd69219c2f85f67e50bfe41aebe3caef = $(`<div id="html_dd69219c2f85f67e50bfe41aebe3caef" style="width: 100.0%; height: 100.0%;">stop_id: 84<br>port: SHANGHAI<br>duration: 8.85 h<br>r95: 0.037 km<br>dh_std: 0.0°<br>dist_port: 4.37 km</div>`)[0];
+                popup_4dabb3c98cbe4ef19e87a4d7cf415917.setContent(html_dd69219c2f85f67e50bfe41aebe3caef);
+            
+        
+
+        circle_marker_7bf1e5a63b2c7a74c20574ca8c3acfa3.bindPopup(popup_4dabb3c98cbe4ef19e87a4d7cf415917)
+        ;
+
+        
+    
+    
+            circle_marker_7bf1e5a63b2c7a74c20574ca8c3acfa3.bindTooltip(
+                `<div>
+                     SHANGHAI | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_9d809a2f00a4e6bfe002c63b06c34776 = L.circleMarker(
+                [31.3403, 121.64920849999999],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_330c6943329eae25fa39f7f7a2a143c5 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_72be2ca70e5eca991dec8cf6292aeaa4 = $(`<div id="html_72be2ca70e5eca991dec8cf6292aeaa4" style="width: 100.0%; height: 100.0%;">stop_id: 85<br>port: SHANGHAI<br>duration: 2.49 h<br>r95: 0.025 km<br>dh_std: 0.6°<br>dist_port: 4.37 km</div>`)[0];
+                popup_330c6943329eae25fa39f7f7a2a143c5.setContent(html_72be2ca70e5eca991dec8cf6292aeaa4);
+            
+        
+
+        circle_marker_9d809a2f00a4e6bfe002c63b06c34776.bindPopup(popup_330c6943329eae25fa39f7f7a2a143c5)
+        ;
+
+        
+    
+    
+            circle_marker_9d809a2f00a4e6bfe002c63b06c34776.bindTooltip(
+                `<div>
+                     SHANGHAI | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_db71abddc1f017be23ef8da97b61e369 = L.circleMarker(
+                [10.666567, 103.462867],
+                {"bubblingMouseEvents": true, "color": "orange", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "orange", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_d3e34803eb7a048a08d4a48561ef791c = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_c60edfa1a3e0b4000c1e934968093896 = $(`<div id="html_c60edfa1a3e0b4000c1e934968093896" style="width: 100.0%; height: 100.0%;">stop_id: 86<br>port: SIHANOUKVILLE<br>duration: 4.54 h<br>r95: 0.118 km<br>dh_std: 20.1°<br>dist_port: 5.28 km</div>`)[0];
+                popup_d3e34803eb7a048a08d4a48561ef791c.setContent(html_c60edfa1a3e0b4000c1e934968093896);
+            
+        
+
+        circle_marker_db71abddc1f017be23ef8da97b61e369.bindPopup(popup_d3e34803eb7a048a08d4a48561ef791c)
+        ;
+
+        
+    
+    
+            circle_marker_db71abddc1f017be23ef8da97b61e369.bindTooltip(
+                `<div>
+                     SIHANOUKVILLE | anchorage
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_c6badfd4958d08e3f5ba292824e60b47 = L.circleMarker(
+                [10.668933, 103.465117],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_3faa23a6e8a8ab49c05dfaa2a046c6fa = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_be7131cdfc01e54a4c41a8bf041e30dd = $(`<div id="html_be7131cdfc01e54a4c41a8bf041e30dd" style="width: 100.0%; height: 100.0%;">stop_id: 87<br>port: SIHANOUKVILLE<br>duration: 3.27 h<br>r95: 0.092 km<br>dh_std: 10.7°<br>dist_port: 5.17 km</div>`)[0];
+                popup_3faa23a6e8a8ab49c05dfaa2a046c6fa.setContent(html_be7131cdfc01e54a4c41a8bf041e30dd);
+            
+        
+
+        circle_marker_c6badfd4958d08e3f5ba292824e60b47.bindPopup(popup_3faa23a6e8a8ab49c05dfaa2a046c6fa)
+        ;
+
+        
+    
+    
+            circle_marker_c6badfd4958d08e3f5ba292824e60b47.bindTooltip(
+                `<div>
+                     SIHANOUKVILLE | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_3bdb412b937442f21fd241b5f57e72ee = L.circleMarker(
+                [10.6692585, 103.464567],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_ceea4572f75f5bd873bf8880006904b9 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_3a898838ff7567c8bce051c6aa505d89 = $(`<div id="html_3a898838ff7567c8bce051c6aa505d89" style="width: 100.0%; height: 100.0%;">stop_id: 88<br>port: SIHANOUKVILLE<br>duration: 4.74 h<br>r95: 0.050 km<br>dh_std: 7.2°<br>dist_port: 5.24 km</div>`)[0];
+                popup_ceea4572f75f5bd873bf8880006904b9.setContent(html_3a898838ff7567c8bce051c6aa505d89);
+            
+        
+
+        circle_marker_3bdb412b937442f21fd241b5f57e72ee.bindPopup(popup_ceea4572f75f5bd873bf8880006904b9)
+        ;
+
+        
+    
+    
+            circle_marker_3bdb412b937442f21fd241b5f57e72ee.bindTooltip(
+                `<div>
+                     SIHANOUKVILLE | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_ad264dfdc708805adc02cea51eb0752f = L.circleMarker(
+                [10.667325, 103.4651915],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_a05a3de8d132d5749b4200d824a80d1a = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_4da5d94748450d8cb88c0003ac744ba0 = $(`<div id="html_4da5d94748450d8cb88c0003ac744ba0" style="width: 100.0%; height: 100.0%;">stop_id: 89<br>port: SIHANOUKVILLE<br>duration: 0.75 h<br>r95: 0.033 km<br>dh_std: 7.5°<br>dist_port: 5.09 km</div>`)[0];
+                popup_a05a3de8d132d5749b4200d824a80d1a.setContent(html_4da5d94748450d8cb88c0003ac744ba0);
+            
+        
+
+        circle_marker_ad264dfdc708805adc02cea51eb0752f.bindPopup(popup_a05a3de8d132d5749b4200d824a80d1a)
+        ;
+
+        
+    
+    
+            circle_marker_ad264dfdc708805adc02cea51eb0752f.bindTooltip(
+                `<div>
+                     SIHANOUKVILLE | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_1159b2061eb91fb485479e3d572c1d49 = L.circleMarker(
+                [10.667017, 103.466217],
+                {"bubblingMouseEvents": true, "color": "orange", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "orange", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_368d643013afaec0afbf6f0bdb089602 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_e3c71a75a898552e1a4c6aba606c681b = $(`<div id="html_e3c71a75a898552e1a4c6aba606c681b" style="width: 100.0%; height: 100.0%;">stop_id: 90<br>port: SIHANOUKVILLE<br>duration: 1.93 h<br>r95: 0.155 km<br>dh_std: 24.1°<br>dist_port: 4.97 km</div>`)[0];
+                popup_368d643013afaec0afbf6f0bdb089602.setContent(html_e3c71a75a898552e1a4c6aba606c681b);
+            
+        
+
+        circle_marker_1159b2061eb91fb485479e3d572c1d49.bindPopup(popup_368d643013afaec0afbf6f0bdb089602)
+        ;
+
+        
+    
+    
+            circle_marker_1159b2061eb91fb485479e3d572c1d49.bindTooltip(
+                `<div>
+                     SIHANOUKVILLE | anchorage
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_3dd2d916cbbd36d4d028e0b182476c9d = L.circleMarker(
+                [10.648767, 103.512033],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_67fe5cc5bc1333aa88da3e05741e4232 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_fca3930d46a0bec8674e059f989437cb = $(`<div id="html_fca3930d46a0bec8674e059f989437cb" style="width: 100.0%; height: 100.0%;">stop_id: 91<br>port: SIHANOUKVILLE<br>duration: 0.54 h<br>r95: 0.021 km<br>dh_std: 0.5°<br>dist_port: 0.58 km</div>`)[0];
+                popup_67fe5cc5bc1333aa88da3e05741e4232.setContent(html_fca3930d46a0bec8674e059f989437cb);
+            
+        
+
+        circle_marker_3dd2d916cbbd36d4d028e0b182476c9d.bindPopup(popup_67fe5cc5bc1333aa88da3e05741e4232)
+        ;
+
+        
+    
+    
+            circle_marker_3dd2d916cbbd36d4d028e0b182476c9d.bindTooltip(
+                `<div>
+                     SIHANOUKVILLE | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_1e8e56e9180d24ace7505480824d6ee7 = L.circleMarker(
+                [10.648683, 103.512133],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_ff8032791ea0d552caae342722143a83 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_15f8cfabbd9f4fb065b47cf1a134e262 = $(`<div id="html_15f8cfabbd9f4fb065b47cf1a134e262" style="width: 100.0%; height: 100.0%;">stop_id: 92<br>port: SIHANOUKVILLE<br>duration: 2.19 h<br>r95: 0.017 km<br>dh_std: 0.0°<br>dist_port: 0.58 km</div>`)[0];
+                popup_ff8032791ea0d552caae342722143a83.setContent(html_15f8cfabbd9f4fb065b47cf1a134e262);
+            
+        
+
+        circle_marker_1e8e56e9180d24ace7505480824d6ee7.bindPopup(popup_ff8032791ea0d552caae342722143a83)
+        ;
+
+        
+    
+    
+            circle_marker_1e8e56e9180d24ace7505480824d6ee7.bindTooltip(
+                `<div>
+                     SIHANOUKVILLE | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_3ea65c2c5667dfdbe3465f025336099a = L.circleMarker(
+                [10.648717, 103.51205],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_263815a94c988f8ede604e2dbca3e7ca = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_5f3709273b1c1d67804f6f296864f7a2 = $(`<div id="html_5f3709273b1c1d67804f6f296864f7a2" style="width: 100.0%; height: 100.0%;">stop_id: 93<br>port: SIHANOUKVILLE<br>duration: 2.15 h<br>r95: 0.023 km<br>dh_std: 0.0°<br>dist_port: 0.58 km</div>`)[0];
+                popup_263815a94c988f8ede604e2dbca3e7ca.setContent(html_5f3709273b1c1d67804f6f296864f7a2);
+            
+        
+
+        circle_marker_3ea65c2c5667dfdbe3465f025336099a.bindPopup(popup_263815a94c988f8ede604e2dbca3e7ca)
+        ;
+
+        
+    
+    
+            circle_marker_3ea65c2c5667dfdbe3465f025336099a.bindTooltip(
+                `<div>
+                     SIHANOUKVILLE | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_2453c3ae49f577df247ffc0089824c70 = L.circleMarker(
+                [10.648667, 103.512017],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_a17ab4bfcec1f6df7943f1de94d779f3 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_783b779699bba2fde3aca465498cc894 = $(`<div id="html_783b779699bba2fde3aca465498cc894" style="width: 100.0%; height: 100.0%;">stop_id: 94<br>port: SIHANOUKVILLE<br>duration: 10.92 h<br>r95: 0.015 km<br>dh_std: 0.5°<br>dist_port: 0.57 km</div>`)[0];
+                popup_a17ab4bfcec1f6df7943f1de94d779f3.setContent(html_783b779699bba2fde3aca465498cc894);
+            
+        
+
+        circle_marker_2453c3ae49f577df247ffc0089824c70.bindPopup(popup_a17ab4bfcec1f6df7943f1de94d779f3)
+        ;
+
+        
+    
+    
+            circle_marker_2453c3ae49f577df247ffc0089824c70.bindTooltip(
+                `<div>
+                     SIHANOUKVILLE | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_f760a17f4b549f02ece46c9710ae4b7e = L.circleMarker(
+                [10.648667, 103.512017],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_0912ebd5147ae1e8929b885bc9ed5417 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_0303421625597872f7d069434ce3b85b = $(`<div id="html_0303421625597872f7d069434ce3b85b" style="width: 100.0%; height: 100.0%;">stop_id: 95<br>port: SIHANOUKVILLE<br>duration: 5.50 h<br>r95: 0.013 km<br>dh_std: 0.5°<br>dist_port: 0.57 km</div>`)[0];
+                popup_0912ebd5147ae1e8929b885bc9ed5417.setContent(html_0303421625597872f7d069434ce3b85b);
+            
+        
+
+        circle_marker_f760a17f4b549f02ece46c9710ae4b7e.bindPopup(popup_0912ebd5147ae1e8929b885bc9ed5417)
+        ;
+
+        
+    
+    
+            circle_marker_f760a17f4b549f02ece46c9710ae4b7e.bindTooltip(
+                `<div>
+                     SIHANOUKVILLE | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_ca7a7891be45c9bb5058897a7eee66ed = L.circleMarker(
+                [10.648683, 103.512033],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_0e71c4a6f212776463ff43a72cf4fad8 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_28469a5e4121e645a0755dff89c00521 = $(`<div id="html_28469a5e4121e645a0755dff89c00521" style="width: 100.0%; height: 100.0%;">stop_id: 96<br>port: SIHANOUKVILLE<br>duration: 0.70 h<br>r95: 0.010 km<br>dh_std: 0.5°<br>dist_port: 0.57 km</div>`)[0];
+                popup_0e71c4a6f212776463ff43a72cf4fad8.setContent(html_28469a5e4121e645a0755dff89c00521);
+            
+        
+
+        circle_marker_ca7a7891be45c9bb5058897a7eee66ed.bindPopup(popup_0e71c4a6f212776463ff43a72cf4fad8)
+        ;
+
+        
+    
+    
+            circle_marker_ca7a7891be45c9bb5058897a7eee66ed.bindTooltip(
+                `<div>
+                     SIHANOUKVILLE | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_afe2d62d3b9b5737357ae975dd606eb7 = L.circleMarker(
+                [13.3582, 100.6249085],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_bd3d9180dc52232a21ab7bfc21577161 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_180dd91615243ebcafcf99f8e82db657 = $(`<div id="html_180dd91615243ebcafcf99f8e82db657" style="width: 100.0%; height: 100.0%;">stop_id: 97<br>port: BANGKOK<br>duration: 11.35 h<br>r95: 0.231 km<br>dh_std: 53.1°<br>dist_port: 29.98 km</div>`)[0];
+                popup_bd3d9180dc52232a21ab7bfc21577161.setContent(html_180dd91615243ebcafcf99f8e82db657);
+            
+        
+
+        circle_marker_afe2d62d3b9b5737357ae975dd606eb7.bindPopup(popup_bd3d9180dc52232a21ab7bfc21577161)
+        ;
+
+        
+    
+    
+            circle_marker_afe2d62d3b9b5737357ae975dd606eb7.bindTooltip(
+                `<div>
+                     BANGKOK | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_22b5438329a04c64d719a861c81b8f04 = L.circleMarker(
+                [13.695967, 100.586167],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_1e3c3e364ddda696bd5e513bc3d591a0 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_bd6e14cf3747a19054b7f274824f2ac3 = $(`<div id="html_bd6e14cf3747a19054b7f274824f2ac3" style="width: 100.0%; height: 100.0%;">stop_id: 98<br>port: BANGKOK<br>duration: 9.59 h<br>r95: 0.016 km<br>dh_std: 0.7°<br>dist_port: 9.35 km</div>`)[0];
+                popup_1e3c3e364ddda696bd5e513bc3d591a0.setContent(html_bd6e14cf3747a19054b7f274824f2ac3);
+            
+        
+
+        circle_marker_22b5438329a04c64d719a861c81b8f04.bindPopup(popup_1e3c3e364ddda696bd5e513bc3d591a0)
+        ;
+
+        
+    
+    
+            circle_marker_22b5438329a04c64d719a861c81b8f04.bindTooltip(
+                `<div>
+                     BANGKOK | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_fae1eb5f5a0d5f3df45a64f8de159579 = L.circleMarker(
+                [13.695967, 100.586183],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_32c8b0b521e30193f34a11ff8a924735 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_2c1b10c0a9eee4cf4143c39dbf67254a = $(`<div id="html_2c1b10c0a9eee4cf4143c39dbf67254a" style="width: 100.0%; height: 100.0%;">stop_id: 99<br>port: BANGKOK<br>duration: 2.67 h<br>r95: 0.017 km<br>dh_std: 0.3°<br>dist_port: 9.35 km</div>`)[0];
+                popup_32c8b0b521e30193f34a11ff8a924735.setContent(html_2c1b10c0a9eee4cf4143c39dbf67254a);
+            
+        
+
+        circle_marker_fae1eb5f5a0d5f3df45a64f8de159579.bindPopup(popup_32c8b0b521e30193f34a11ff8a924735)
+        ;
+
+        
+    
+    
+            circle_marker_fae1eb5f5a0d5f3df45a64f8de159579.bindTooltip(
+                `<div>
+                     BANGKOK | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_215e921989c4aff53443d95631c1ecc0 = L.circleMarker(
+                [13.114283, 100.704783],
+                {"bubblingMouseEvents": true, "color": "orange", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "orange", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_c1708302c1fe8752fc35bfb5863be26e = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_d1a347a77e5d5d152f9cdc58ae7d47df = $(`<div id="html_d1a347a77e5d5d152f9cdc58ae7d47df" style="width: 100.0%; height: 100.0%;">stop_id: 100<br>port: KO SICHANG<br>duration: 0.56 h<br>r95: 0.160 km<br>dh_std: 15.5°<br>dist_port: 13.03 km</div>`)[0];
+                popup_c1708302c1fe8752fc35bfb5863be26e.setContent(html_d1a347a77e5d5d152f9cdc58ae7d47df);
+            
+        
+
+        circle_marker_215e921989c4aff53443d95631c1ecc0.bindPopup(popup_c1708302c1fe8752fc35bfb5863be26e)
+        ;
+
+        
+    
+    
+            circle_marker_215e921989c4aff53443d95631c1ecc0.bindTooltip(
+                `<div>
+                     KO SICHANG | anchorage
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_357d4e2af1493461301b38fed8a50b37 = L.circleMarker(
+                [13.064667, 100.892317],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_89a4ce7622485330268dd48a66c9b20f = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_de3e2b26b76e4d76646524e2c6761a1f = $(`<div id="html_de3e2b26b76e4d76646524e2c6761a1f" style="width: 100.0%; height: 100.0%;">stop_id: 101<br>port: LAEM CHABANG<br>duration: 12.92 h<br>r95: 0.021 km<br>dh_std: 0.4°<br>dist_port: 0.72 km</div>`)[0];
+                popup_89a4ce7622485330268dd48a66c9b20f.setContent(html_de3e2b26b76e4d76646524e2c6761a1f);
+            
+        
+
+        circle_marker_357d4e2af1493461301b38fed8a50b37.bindPopup(popup_89a4ce7622485330268dd48a66c9b20f)
+        ;
+
+        
+    
+    
+            circle_marker_357d4e2af1493461301b38fed8a50b37.bindTooltip(
+                `<div>
+                     LAEM CHABANG | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_977c0ac546aa51052d702ca4439a5eb8 = L.circleMarker(
+                [21.386083, 108.7284085],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_5b713461a0f99f9f8872062086ed9cac = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_07b99d56182c280467d06c2fb191fe70 = $(`<div id="html_07b99d56182c280467d06c2fb191fe70" style="width: 100.0%; height: 100.0%;">stop_id: 102<br>port: QINZHOU<br>duration: 5.10 h<br>r95: 0.061 km<br>dh_std: 9.4°<br>dist_port: 34.09 km</div>`)[0];
+                popup_5b713461a0f99f9f8872062086ed9cac.setContent(html_07b99d56182c280467d06c2fb191fe70);
+            
+        
+
+        circle_marker_977c0ac546aa51052d702ca4439a5eb8.bindPopup(popup_5b713461a0f99f9f8872062086ed9cac)
+        ;
+
+        
+    
+    
+            circle_marker_977c0ac546aa51052d702ca4439a5eb8.bindTooltip(
+                `<div>
+                     QINZHOU | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_d2076f5db34a823d0550d795e56fc5dc = L.circleMarker(
+                [21.385583, 108.727883],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_bd5df0151e2384819886f0a45db0ec57 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_a08e83adabb03bb8ea950fc5c8c07402 = $(`<div id="html_a08e83adabb03bb8ea950fc5c8c07402" style="width: 100.0%; height: 100.0%;">stop_id: 103<br>port: QINZHOU<br>duration: 3.50 h<br>r95: 0.037 km<br>dh_std: 5.3°<br>dist_port: 34.13 km</div>`)[0];
+                popup_bd5df0151e2384819886f0a45db0ec57.setContent(html_a08e83adabb03bb8ea950fc5c8c07402);
+            
+        
+
+        circle_marker_d2076f5db34a823d0550d795e56fc5dc.bindPopup(popup_bd5df0151e2384819886f0a45db0ec57)
+        ;
+
+        
+    
+    
+            circle_marker_d2076f5db34a823d0550d795e56fc5dc.bindTooltip(
+                `<div>
+                     QINZHOU | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_c75fdff5ded687c7cf99f73494fb21ec = L.circleMarker(
+                [21.385283, 108.727767],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_634299f0265c40990931a293499fd41f = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_a85824c605be2bdcd906a89b5573ded3 = $(`<div id="html_a85824c605be2bdcd906a89b5573ded3" style="width: 100.0%; height: 100.0%;">stop_id: 104<br>port: QINZHOU<br>duration: 18.70 h<br>r95: 0.080 km<br>dh_std: 14.1°<br>dist_port: 34.16 km</div>`)[0];
+                popup_634299f0265c40990931a293499fd41f.setContent(html_a85824c605be2bdcd906a89b5573ded3);
+            
+        
+
+        circle_marker_c75fdff5ded687c7cf99f73494fb21ec.bindPopup(popup_634299f0265c40990931a293499fd41f)
+        ;
+
+        
+    
+    
+            circle_marker_c75fdff5ded687c7cf99f73494fb21ec.bindTooltip(
+                `<div>
+                     QINZHOU | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_7185231a9d8ddccccb7e501a19b87661 = L.circleMarker(
+                [21.38635, 108.728833],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_fbac48444e9c988309d7a7dd4e48ae46 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_9940c2d84b71d2652cac6451b7d9fefc = $(`<div id="html_9940c2d84b71d2652cac6451b7d9fefc" style="width: 100.0%; height: 100.0%;">stop_id: 105<br>port: QINZHOU<br>duration: 10.35 h<br>r95: 0.146 km<br>dh_std: 19.9°<br>dist_port: 34.07 km</div>`)[0];
+                popup_fbac48444e9c988309d7a7dd4e48ae46.setContent(html_9940c2d84b71d2652cac6451b7d9fefc);
+            
+        
+
+        circle_marker_7185231a9d8ddccccb7e501a19b87661.bindPopup(popup_fbac48444e9c988309d7a7dd4e48ae46)
+        ;
+
+        
+    
+    
+            circle_marker_7185231a9d8ddccccb7e501a19b87661.bindTooltip(
+                `<div>
+                     QINZHOU | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_e15dbfe0589cddd1d4b6a669f50ec9f2 = L.circleMarker(
+                [21.666267, 108.6482],
+                {"bubblingMouseEvents": true, "color": "green", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "green", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_05b9be816687f606e5e5e04be58543c6 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_d11f2586525357ae4d15850f9dbaaf3f = $(`<div id="html_d11f2586525357ae4d15850f9dbaaf3f" style="width: 100.0%; height: 100.0%;">stop_id: 106<br>port: QINZHOU<br>duration: 7.20 h<br>r95: 0.027 km<br>dh_std: 1.0°<br>dist_port: 1.88 km</div>`)[0];
+                popup_05b9be816687f606e5e5e04be58543c6.setContent(html_d11f2586525357ae4d15850f9dbaaf3f);
+            
+        
+
+        circle_marker_e15dbfe0589cddd1d4b6a669f50ec9f2.bindPopup(popup_05b9be816687f606e5e5e04be58543c6)
+        ;
+
+        
+    
+    
+            circle_marker_e15dbfe0589cddd1d4b6a669f50ec9f2.bindTooltip(
+                `<div>
+                     QINZHOU | moored
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_5043752c512c1d0f5f730c64e851ef2e = L.circleMarker(
+                [31.060433, 122.984483],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_c493b92c8616db53c9564d384f8fd24e = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_08d0a0570850e8261efe93a242538659 = $(`<div id="html_08d0a0570850e8261efe93a242538659" style="width: 100.0%; height: 100.0%;">stop_id: 107<br>port: LUHUASHAN<br>duration: 21.20 h<br>r95: 0.300 km<br>dh_std: 64.8°<br>dist_port: 47.97 km</div>`)[0];
+                popup_c493b92c8616db53c9564d384f8fd24e.setContent(html_08d0a0570850e8261efe93a242538659);
+            
+        
+
+        circle_marker_5043752c512c1d0f5f730c64e851ef2e.bindPopup(popup_c493b92c8616db53c9564d384f8fd24e)
+        ;
+
+        
+    
+    
+            circle_marker_5043752c512c1d0f5f730c64e851ef2e.bindTooltip(
+                `<div>
+                     LUHUASHAN | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_64ee69c0cd4208939b949039eb16f013 = L.circleMarker(
+                [31.058883, 122.9843665],
+                {"bubblingMouseEvents": true, "color": "gray", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "gray", "fillOpacity": 0.8, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 3}
+            ).addTo(map_531e709cee1be874643502e37f3f3140);
+        
+    
+        var popup_2111d769727f7cc199367b8141ade7f4 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_e75fef01c379fbb5838f23295f2dd32a = $(`<div id="html_e75fef01c379fbb5838f23295f2dd32a" style="width: 100.0%; height: 100.0%;">stop_id: 108<br>port: LUHUASHAN<br>duration: 1.18 h<br>r95: 0.133 km<br>dh_std: 4.9°<br>dist_port: 47.85 km</div>`)[0];
+                popup_2111d769727f7cc199367b8141ade7f4.setContent(html_e75fef01c379fbb5838f23295f2dd32a);
+            
+        
+
+        circle_marker_64ee69c0cd4208939b949039eb16f013.bindPopup(popup_2111d769727f7cc199367b8141ade7f4)
+        ;
+
+        
+    
+    
+            circle_marker_64ee69c0cd4208939b949039eb16f013.bindTooltip(
+                `<div>
+                     LUHUASHAN | offshore
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+</script>
+</html>

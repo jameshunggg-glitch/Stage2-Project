@@ -13,13 +13,14 @@ from voyage_splitter import detect_stops, split_voyages, voyage_quality_checker
 from visualization import visualize_voyages
 from od_marker import assign_ports
 from Trajectory_Recon import TrajectoryReconstructor  # 新增這行
+from data_quality import voyage_integrity_metrics
 
 def main():
     # -----------------------------------
     # Step 1: 載入與前處理
     # -----------------------------------
-    csv_path = Path(r"C:\Users\slab\Desktop") / "Slab Project" / "Stage1" / "data" / "416044000.csv"
-    target_mmsi = 416044000
+    csv_path = Path(r"C:\Users\slab\Desktop") / "Slab Project" / "Stage1" / "data" / "Device_AB00030.csv"
+    target_mmsi = 636012794
 
     print("載入與前處理資料中...")
     df = load_and_preprocess(csv_path, target_mmsi)
@@ -47,9 +48,19 @@ def main():
     print(f"QA 完成，有效航程數量: {voyages_qc['valid_flag'].sum()}")
 
     # -----------------------------------
-    # Step 5: 合併 QA 結果 + 航程索引
+    # Step 4.5: 航程品質指標（
+    # 這個函式沒有 invalid_reason，本來就沒有關係，我們把它當「補充欄位」再 merge
     # -----------------------------------
+    voyages_qc_integrity = voyage_integrity_metrics(df_with_voyages, voyages)
+    print(voyages_qc_integrity[["voyage_id", "max_gap_hr",
+                                "avg_signal_interval_sec",
+                                "coverage_ratio",
+                                "signal_quality_flag"]].head())
+    
+    # 把兩份 QA 結果都併回 voyages
     voyages_merged = voyages.merge(voyages_qc, on="voyage_id", how="left")
+    voyages_merged = voyages_merged.merge(voyages_qc_integrity, on="voyage_id", how="left")
+
 
     # -----------------------------------
     # Step 5.5: 航跡修復（Trajectory Reconstruction）
