@@ -39,6 +39,27 @@ def geodesic_midpoint(a: Tuple[float,float], b: Tuple[float,float]) -> Tuple[flo
     pts = geodesic_sample(a, b, step_km=500.0)
     return pts[len(pts)//2]
 
+def densify_geodesic(a: Tuple[float,float], b: Tuple[float,float], max_step_km: float = 10.0):
+    """
+    Return [a, ..., b] approximating the geodesic between a and b,
+    with ~max_step_km spacing (endpoints included).
+    """
+    total = geodesic_km(a, b)  # <- 用本檔 alias
+    # pyproj.Geod.npts 產生「不含兩端點」的中間點數
+    n_interior = int(total / max_step_km)
+    if n_interior <= 0:
+        return [a, b]
+    inter = GEOD.npts(a[0], a[1], b[0], b[1], n_interior)
+    return [a] + [(lon, lat) for (lon, lat) in inter] + [b]
+
+# （供修復器用）
+def geodesic_fwd(lon: float, lat: float, azimuth_deg: float, dist_km: float) -> Tuple[float,float]:
+    """
+    From (lon,lat), go azimuth_deg for dist_km along the geodesic, return new (lon,lat).
+    """
+    lon2, lat2, _ = GEOD.fwd(lon, lat, azimuth_deg, dist_km * 1000.0)
+    return float(lon2), float(lat2)
+
 # --- compatibility aliases ---
 def great_circle_midpoint(a, b):
     """Alias for backward compatibility."""
@@ -51,3 +72,5 @@ def bearing_xy(a: Tuple[float,float], b: Tuple[float,float]) -> float:
 def geodesic_azimuth(a: Tuple[float,float], b: Tuple[float,float]) -> float:
     fwd_az, _, _ = GEOD.inv(a[0], a[1], b[0], b[1])
     return (fwd_az + 360.0) % 360.0
+
+geodesic_km = gc_distance_km
