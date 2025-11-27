@@ -16,3 +16,7 @@ Thumbs.db
 # IDE 設定
 .vscode/
 .idea/
+
+# 大型輸出檔（不需要上傳）
+*.html
+*.csv

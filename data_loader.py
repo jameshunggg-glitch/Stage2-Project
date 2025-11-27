@@ -17,6 +17,9 @@ SECOND_STAGE_EPS_KM = 1.0  # merge harbour centers within 1 km
 LAND_FILE = Path(r"C:\Users\slab\Desktop\Slab Project\Stage1\data\Land\ne_10m_land.shp")
 PORTS_CSV = Path(r"C:\Users\slab\Desktop\Slab Project\Stage1\data\filtered_ports.csv")
 
+# ★ SOG 上限（knots），超過視為雜訊
+SOG_CAP = 50.0
+
 # 載入陸地 shapefile（可延遲載入）
 land = gpd.read_file(LAND_FILE)
 
@@ -42,7 +45,6 @@ def parse_timestamp(series: pd.Series) -> pd.Series:
 
     # 合併結果
     ts = pd.concat([ts, ts_other]).sort_index()
-
     return ts
 
 
@@ -74,28 +76,72 @@ def load_and_preprocess(csv_path: Path, target_mmsi: int) -> pd.DataFrame:
         print(f" 找不到時間欄位，欄位清單: {list(df.columns)}")
         raise ValueError("請確認時間欄位名稱 (必須是 Timestamp 或 DataSourceLastTime_UTC)")
 
-    # 現在才用 MMSI 篩選
-    #df = df[df["MMSI"] == target_mmsi].copy()
-    #  強制轉成整數後比對（避免 636012794 vs 636012794.0）
+    # -----------------------------------
+    # MMSI 篩選（強制轉 Int 比對）
+    # -----------------------------------
     df = df[df["MMSI"].round().astype("Int64") == int(target_mmsi)].copy()
 
-
-    # 基本欄位清理
+    # -----------------------------------
+    # 基本欄位清理（先轉數值）
+    # -----------------------------------
     df["Lat"] = pd.to_numeric(df["Lat"], errors="coerce")
     df["Long"] = pd.to_numeric(df["Long"], errors="coerce")
-    df["Long_360"] = df["Long"] % 360
     df["Sog"] = pd.to_numeric(df["Sog"], errors="coerce")
-    df = df.dropna(subset=["Lat", "Long", "Sog"])
 
-    # 經緯度範圍過濾
-    df = df[df["Lat"].between(-90.0, 90.0)]
-    df = df[df["Long"].between(-180.0, 180.0)]
-
-    # 時間處理 (自動判斷格式)
+    # -----------------------------------
+    # 時間處理（先做 Timestamp，才能做「更換設備 SOG 校正」）
+    # -----------------------------------
     df["Timestamp"] = parse_timestamp(df["Timestamp"])
     df = df.dropna(subset=["Timestamp"])
 
+    # -----------------------------------
+    #  特例：豐順輪(MMSI=477769500) 更換設備後 SOG 單位校正
+    # -----------------------------------
+    if int(target_mmsi) == 477769500:
+        sog_fix_threshold = pd.to_datetime("2025-07-25 10:58:10")
+        mask = df["Timestamp"] > sog_fix_threshold
+        # 新設備回報值比舊的大 10 倍 → 除以 10 校正
+        df.loc[mask, "Sog"] = df.loc[mask, "Sog"] / 10.0
+        print("  已對 MMSI=477769500 進行 SOG 校正（/10）")
+
+    if int(target_mmsi) == 477300400:
+        df["Sog"] = df["Sog"] / 10.0
+        print("  已對 MMSI=477300400 進行 SOG 校正（/10）")
+    
+    if int(target_mmsi) == 477848300:
+        df["Sog"] = df["Sog"] / 10.0
+        print("  已對 MMSI=477848300 進行 SOG 校正（/10）")
+    
+    if int(target_mmsi) == 416041000:
+        df["Sog"] = df["Sog"] / 10.0
+        print("  已對 MMSI=416041000 進行 SOG 校正（/10）")
+
+    # -----------------------------------
+    # 去除缺值（放在校正後）
+    # -----------------------------------
+    df = df.dropna(subset=["Lat", "Long", "Sog"])
+
+    # -----------------------------------
+    # 經緯度範圍過濾
+    # -----------------------------------
+    df = df[df["Lat"].between(-90.0, 90.0)]
+    df = df[df["Long"].between(-180.0, 180.0)]
+
+    # Long_360（在經度合理後再算）
+    df["Long_360"] = df["Long"] % 360
+
+    # -----------------------------------
+    # ★ SOG CAP：刪除不合理尖峰（含負值）
+    # -----------------------------------
+    before = len(df)
+    df = df[df["Sog"].between(0.0, SOG_CAP)].copy()
+    dropped = before - len(df)
+    if dropped > 0:
+        print(f"  已套用 SOG_CAP={SOG_CAP}：刪除 {dropped} 筆不合理 SOG")
+
+    # -----------------------------------
     # 排序
+    # -----------------------------------
     df = df.sort_values("Timestamp", kind="mergesort").reset_index(drop=True)
 
     return df

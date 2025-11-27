@@ -21,7 +21,7 @@ def _safe_haversine(c1, c2):
 # -----------------------------------
 # 停泊判斷
 # -----------------------------------
-def detect_stops(df, sog_threshold=0.5, max_gap_sec=120,
+def detect_stops(df, sog_threshold=1.0, max_gap_sec=120,
                  min_stop_sec=1800, max_stop_radius=0.3):
     """
     停泊判斷：根據 SOG 與空間半徑過濾
