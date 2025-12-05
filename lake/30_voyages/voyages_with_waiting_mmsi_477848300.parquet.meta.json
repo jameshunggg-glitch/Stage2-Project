@@ -1,0 +1,49 @@
+{
+  "saved_at": "2025-12-05T16:17:58",
+  "path": "C:\\Users\\slab\\Desktop\\Slab Project\\Stage2 ETA\\lake\\30_voyages\\voyages_with_waiting_mmsi_477848300.parquet",
+  "shape": [
+    114,
+    17
+  ],
+  "columns": [
+    "voyage_id",
+    "origin_call_id",
+    "dest_call_id",
+    "origin_port_id",
+    "dest_port_id",
+    "origin_port_name",
+    "dest_port_name",
+    "t_depart_origin",
+    "t_arrive_dest",
+    "total_waiting_sec",
+    "n_points",
+    "max_dt_sec",
+    "max_dt_hr",
+    "gap_from",
+    "gap_to",
+    "large_time_gap_flag",
+    "mmsi"
+  ],
+  "dtypes": {
+    "voyage_id": "int64",
+    "origin_call_id": "int64",
+    "dest_call_id": "int64",
+    "origin_port_id": "object",
+    "dest_port_id": "object",
+    "origin_port_name": "object",
+    "dest_port_name": "object",
+    "t_depart_origin": "datetime64[ns]",
+    "t_arrive_dest": "datetime64[ns]",
+    "total_waiting_sec": "float64",
+    "n_points": "int64",
+    "max_dt_sec": "float64",
+    "max_dt_hr": "float64",
+    "gap_from": "datetime64[ns]",
+    "gap_to": "datetime64[ns]",
+    "large_time_gap_flag": "bool",
+    "mmsi": "int64"
+  },
+  "meta": {
+    "stage": "voyages_with_waiting"
+  }
+}
