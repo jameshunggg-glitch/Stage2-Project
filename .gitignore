@@ -20,3 +20,15 @@ Thumbs.db
 # 大型輸出檔（不需要上傳）
 *.html
 *.csv
+
+# ---- data lake / cache artifacts ----
+lake/
+lake/**
+
+# （可選）你的地圖輸出通常也很大
+**/*.html
+
+# （可選）常見大檔資料格式
+**/*.parquet
+**/*.pkl
+**/*.pickle
