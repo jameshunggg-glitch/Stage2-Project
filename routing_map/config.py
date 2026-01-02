@@ -2,8 +2,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Tuple
-
 from .types import LonLat, BBoxLL
+from dataclasses import dataclass, field
+from typing import List
 
 @dataclass
 class LandConfig:
@@ -54,12 +55,26 @@ class GateFConfig:
 @dataclass
 class SeaConfig:
     # Gate-B v1 parameters
-    r_max_km: float = 250.0
-    candidate_top_n: int = 15
+    r_max_km: float = 300.0
+    candidate_top_n: int = 40
     k_connect: int = 3
     deg_min: int = 1
-    aoi_pad_deg: float = 2.0
+    aoi_pad_deg: float = 3.0
     use_largest_component_only: bool = True
+
+@dataclass
+class CoverageConfig:
+    # 沿岸 gate spacing（km）：越小 gate 越密；Phase1 建議先 80~150 試
+    gate_spacing_km: float = 120.0
+
+    # 每條 ring 抽樣後至少保留幾個 gate（你指定 1）
+    min_per_ring: int = 1
+
+    # 同一位置/很近時的優先順序（你選 Gate_A + Gate_F 都套，且 Gate_F 優先）
+    prefer_source_order: List[str] = field(default_factory=lambda: ["Gate_F", "Gate_A"])
+
+    # debug log
+    debug: bool = True
 
 @dataclass
 class RoutingMapConfig:
@@ -71,3 +86,6 @@ class RoutingMapConfig:
     gate_a: GateAConfig = GateAConfig()
     gate_f: GateFConfig = GateFConfig()
     sea: SeaConfig = SeaConfig()
+    coverage: CoverageConfig = CoverageConfig()
+
+
