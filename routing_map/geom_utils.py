@@ -44,16 +44,71 @@ def geom_to_m(geom, proj: AOIProjector):
 def geom_to_ll(geom, proj: AOIProjector):
     return transform(lambda x, y, z=None: proj.to_ll.transform(x, y), geom)
 
-def linestring_sample_points(line: LineString, ds_m: float) -> List:
-    """Sample along a LineString by distance (meters). Includes endpoints."""
-    if line.is_empty:
+# routing_map/geom_utils.py
+
+from shapely.geometry import Point
+
+def linestring_sample_points(line, ds_m: float):
+    """
+    Sample points along a LineString / LinearRing every ds_m meters.
+    - Works for open LineString and closed rings (LinearRing or closed LineString).
+    - Always includes a final point at distance L (end), for rings it's the same as start.
+    """
+    if line is None or line.is_empty:
         return []
+
     L = float(line.length)
     if L <= 0:
-        return []
-    n = max(2, int(math.ceil(L / ds_m)) + 1)
+        # degenerate
+        try:
+            return [Point(line.coords[0])]
+        except Exception:
+            return []
+
+    ds_m = float(ds_m)
+    if ds_m <= 0:
+        return [line.interpolate(0.0), line.interpolate(L)]
+
+    # number of points (include 0, exclude L first; we'll force L at the end)
+    n = int(L // ds_m) + 1
     pts = [line.interpolate(i * ds_m) for i in range(n)]
-    # ensure last is end
-    if pts and pts[-1].distance(line.boundary.geoms[-1]) > 1e-6:
-        pts[-1] = line.interpolate(L)
+
+    # --- Force last point to be at L, but do NOT use boundary for rings (boundary empty) ---
+    try:
+        end_pt = line.interpolate(L)
+        if not pts:
+            pts = [end_pt]
+        else:
+            # if last isn't close to end_pt, replace last
+            if pts[-1].distance(end_pt) > 1e-6:
+                pts[-1] = end_pt
+    except Exception:
+        # fallback: just return what we have
+        pass
+
     return pts
+
+# ---- bbox helpers ----
+
+def expand_bbox_ll(bbox_ll: Tuple[float, float, float, float], pad_deg: float) -> Tuple[float, float, float, float]:
+    """
+    Expand lon/lat bbox by pad_deg on each side.
+    NOTE: This is a simple implementation (no dateline split). Works well for your E/SE Asia AOIs.
+    """
+    min_lon, min_lat, max_lon, max_lat = [float(v) for v in bbox_ll]
+    p = float(pad_deg)
+
+    min_lon2 = min_lon - p
+    max_lon2 = max_lon + p
+    min_lat2 = min_lat - p
+    max_lat2 = max_lat + p
+
+    # clamp latitude to valid range
+    min_lat2 = max(-89.9999, min_lat2)
+    max_lat2 = min( 89.9999, max_lat2)
+
+    # keep lon within [-180, 180] (simple clamp)
+    min_lon2 = max(-180.0, min_lon2)
+    max_lon2 = min( 180.0, max_lon2)
+
+    return (min_lon2, min_lat2, max_lon2, max_lat2)

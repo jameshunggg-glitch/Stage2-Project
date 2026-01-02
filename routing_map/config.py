@@ -57,7 +57,8 @@ class SeaConfig:
     r_max_km: float = 250.0
     candidate_top_n: int = 15
     k_connect: int = 3
-    deg_min: int = 2
+    deg_min: int = 1
+    aoi_pad_deg: float = 2.0
     use_largest_component_only: bool = True
 
 @dataclass

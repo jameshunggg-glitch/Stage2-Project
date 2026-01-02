@@ -1,56 +1,117 @@
+# routing_map/io_land.py
 from __future__ import annotations
+
 from pathlib import Path
-from typing import List
+from typing import Tuple, List, Iterable
 
 import geopandas as gpd
-from shapely.geometry import box
-from shapely.errors import GEOSException
+from shapely.geometry import box, Polygon, MultiPolygon, GeometryCollection
+from shapely.geometry.base import BaseGeometry
 
-try:
-    from shapely.validation import make_valid  # shapely 2.x
-except Exception:  # pragma: no cover
-    make_valid = None
 
-def load_polys_in_bbox(shp_path: str | Path, bbox_ll: tuple[float, float, float, float]):
-    """Load land polygons intersecting bbox (lon/lat), robustly.
+def _iter_polygons(geom: BaseGeometry) -> Iterable[Polygon]:
+    """Yield Polygon parts from Polygon / MultiPolygon / GeometryCollection."""
+    if geom is None or geom.is_empty:
+        return
+    if isinstance(geom, Polygon):
+        yield geom
+        return
+    if isinstance(geom, MultiPolygon):
+        for p in geom.geoms:
+            if p is not None and (not p.is_empty):
+                yield p
+        return
+    if isinstance(geom, GeometryCollection):
+        for g in geom.geoms:
+            yield from _iter_polygons(g)
+        return
 
-    Returns: list[shapely geometry] in lon/lat (EPSG:4326).
+
+def load_polys_in_bbox(
+    shp_path: Path,
+    bbox_ll: Tuple[float, float, float, float],
+    *,
+    fix_invalid: bool = True,
+    debug: bool = False,
+) -> List[Polygon]:
+    """
+    Load land polygons for AOI bbox (lon/lat), WITHOUT clipping to bbox edges.
+    Key idea:
+      - spatial filter by bbox (fast path if supported)
+      - then explode MultiPolygons into Polygon parts
+      - keep ONLY parts that intersect bbox (still no clipping)
+
+    This avoids AOI-frame artifacts while preventing far-away MultiPolygon parts
+    from leaking into the AOI pipeline (the cause of "nodes appear in Americas").
     """
     shp_path = Path(shp_path)
-    (min_lon, min_lat, max_lon, max_lat) = bbox_ll
-    bbox = box(min_lon, min_lat, max_lon, max_lat)
+    if not shp_path.exists():
+        raise FileNotFoundError(f"Land shapefile not found: {shp_path}")
 
-    gdf = gpd.read_file(shp_path, bbox=bbox)
+    min_lon, min_lat, max_lon, max_lat = [float(x) for x in bbox_ll]
+    bbox_tuple = (min_lon, min_lat, max_lon, max_lat)
+    bbox_geom = box(*bbox_tuple)
+
+    # ---- read ----
+    read_used_bbox = True
+    try:
+        # geopandas accepts bbox as (minx, miny, maxx, maxy)
+        gdf = gpd.read_file(shp_path, bbox=bbox_tuple)
+    except Exception:
+        read_used_bbox = False
+        gdf = gpd.read_file(shp_path)
+
     if gdf.empty:
         return []
 
-    # Ensure lon/lat
-    if gdf.crs is not None and str(gdf.crs).lower() not in ("epsg:4326", "wgs84"):
-        gdf = gdf.to_crs("EPSG:4326")
-
-    # explode multiparts
+    # ---- CRS safety ----
     try:
-        gdf = gdf.explode(index_parts=False, ignore_index=True)
-    except TypeError:
-        gdf = gdf.explode()
+        if gdf.crs is not None and gdf.crs.to_epsg() != 4326:
+            gdf = gdf.to_crs("EPSG:4326")
+    except Exception:
+        # if CRS missing/odd, we still proceed (best effort)
+        pass
 
-    geoms = []
-    for g in gdf.geometry:
-        if g is None:
-            continue
+    # ---- optional: fix invalid geometries ----
+    if fix_invalid:
         try:
-            gg = g
-            if make_valid is not None:
-                gg = make_valid(gg)
-            gg = gg.buffer(0)
-            if not gg.is_empty:
-                geoms.append(gg)
-        except GEOSException:
-            # last resort: buffer(0) only
+            # buffer(0) trick to fix self-intersections etc.
+            gdf["geometry"] = gdf.geometry.buffer(0)
+        except Exception:
+            pass
+
+    # ---- coarse filter by bbox intersection (feature-level) ----
+    # IMPORTANT: do not swallow errors silently; if this fails, we would leak global land.
+    try:
+        gdf = gdf[gdf.geometry.intersects(bbox_geom)]
+    except Exception as e:
+        raise RuntimeError(
+            "Failed to bbox-filter land geometries via intersects(). "
+            "This would leak global geometries into AOI. "
+            f"Original error: {type(e).__name__}: {e}"
+        )
+
+    if gdf.empty:
+        return []
+
+    # ---- explode MultiPolygons into polygon parts and keep only parts intersecting bbox ----
+    kept: List[Polygon] = []
+    for geom in gdf.geometry.values:
+        for p in _iter_polygons(geom):
+            # keep only polygon parts that actually intersect bbox
+            # (still NO clipping)
             try:
-                gg = g.buffer(0)
-                if not gg.is_empty:
-                    geoms.append(gg)
+                if p.intersects(bbox_geom):
+                    kept.append(p)
             except Exception:
+                # If a single part is problematic, skip it rather than leaking global.
                 continue
-    return geoms
+
+    if debug:
+        print(
+            f"[io_land] read_used_bbox={read_used_bbox} "
+            f"features_after_filter={len(gdf)} polygon_parts_kept={len(kept)} "
+            f"bbox_ll={bbox_ll}"
+        )
+
+    return kept
