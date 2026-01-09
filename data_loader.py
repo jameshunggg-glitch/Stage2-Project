@@ -115,6 +115,7 @@ def load_and_preprocess(csv_path: Path, target_mmsi: int) -> pd.DataFrame:
     if int(target_mmsi) == 416041000:
         df["Sog"] = df["Sog"] / 10.0
         print("  已對 MMSI=416041000 進行 SOG 校正（/10）")
+        
 
     # -----------------------------------
     # 去除缺值（放在校正後）
