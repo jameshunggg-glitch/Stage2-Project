@@ -107,11 +107,12 @@ def _try_geograph_adjlist_bundle(
             cnt_lonlat += 1
 
     # choose mapping
-    use_lonlat = (cnt_lonlat > cnt_latlon)
+    #use_lonlat = (cnt_lonlat > cnt_latlon)
+    use_lonlat = False  # FORCE: nodes are [lat, lon]
 
     def to_lonlat(p):
         a, b = float(p[0]), float(p[1])
-        return (a, b) if use_lonlat else (b, a)
+        return (b, a)  # (lon,lat)
 
     # ---- build idx2pt for in-bbox nodes ----
     idx2pt: Dict[int, LonLat] = {}

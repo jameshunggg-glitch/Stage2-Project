@@ -29,6 +29,68 @@ def _pad_bbox_ll(bbox_ll, pad_deg: float):
     x0, y0, x1, y1 = [float(v) for v in bbox_ll]
     return (x0 - pad_deg, y0 - pad_deg, x1 + pad_deg, y1 + pad_deg)
 
+def _bbox_crosses_dateline(bbox_ll):
+    x0, y0, x1, y1 = map(float, bbox_ll)
+    # 規則：允許用 x0 > x1 表達跨日界（例如 170 到 -170）
+    return x0 > x1
+
+def _split_bbox_dateline(bbox_ll):
+    """
+    Split dateline-crossing bbox into two normal bboxes.
+    Input bbox format: (min_lon, min_lat, max_lon, max_lat)
+    If min_lon <= max_lon: returns [bbox]
+    If min_lon > max_lon (crosses dateline): returns two bboxes:
+      [ (min_lon, min_lat, 180, max_lat), (-180, min_lat, max_lon, max_lat) ]
+    """
+    x0, y0, x1, y1 = map(float, bbox_ll)
+    if x0 <= x1:
+        return [(x0, y0, x1, y1)]
+    return [(x0, y0, 180.0, y1), (-180.0, y0, x1, y1)]
+
+def _merge_sc_bundles(bundles):
+    """Merge multiple scgraph bundles into one bundle."""
+    nodes_set = set()
+    edges_set = set()
+    stats = {"source": [], "node_count_parts": [], "edge_count_parts": []}
+
+    for b in bundles:
+        if not isinstance(b, dict):
+            continue
+        nodes = b.get("nodes", []) or []
+        edges = b.get("edges", []) or []
+        st = b.get("stats", {}) or {}
+
+        # nodes
+        for p in nodes:
+            if isinstance(p, (tuple, list)) and len(p) == 2:
+                nodes_set.add((float(p[0]), float(p[1])))
+
+        # edges: canonicalize (a,b) order so duplicates merge
+        for e in edges:
+            if not (isinstance(e, (tuple, list)) and len(e) == 2):
+                continue
+            a, c = e
+            if not (isinstance(a, (tuple, list)) and len(a) == 2 and isinstance(c, (tuple, list)) and len(c) == 2):
+                continue
+            pa = (float(a[0]), float(a[1]))
+            pc = (float(c[0]), float(c[1]))
+            if pa == pc:
+                continue
+            edges_set.add((pa, pc) if pa <= pc else (pc, pa))
+
+        # stats (optional)
+        stats["source"].append(st.get("source"))
+        stats["node_count_parts"].append(st.get("node_count"))
+        stats["edge_count_parts"].append(st.get("edge_count"))
+
+    nodes_out = list(nodes_set)
+    edges_out = list(edges_set)
+    stats["node_count"] = len(nodes_out)
+    stats["edge_count"] = len(edges_out)
+    stats["source"] = "+".join([s for s in stats["source"] if s])
+
+    return {"nodes": nodes_out, "edges": edges_out, "stats": stats}
+
 
 def _filter_df_in_bbox(df, bbox_ll, lon_col="lon", lat_col="lat"):
     if df is None or len(df) == 0:
@@ -138,9 +200,18 @@ def build_aoi(cfg: RoutingMapConfig) -> Dict[str, Any]:
     Gate_all_cov["gate_uid"] = np.arange(len(Gate_all_cov), dtype=int)
 
     # --- Sea subnet (scgraph) ---
+    #bbox_ll_sea = _pad_bbox_ll(bbox_ll, pad_deg=float(cfg.sea.aoi_pad_deg))
+    #bundle = scgraph_bridge.sc_edges_in_bbox(bbox_ll=bbox_ll_sea)  # 你現在的 adapter 會回 nodes/edges/stats
+    #S_nodes, S_edges, G, kdt = build_sea_nodes_from_bundle(proj, bundle)
     bbox_ll_sea = _pad_bbox_ll(bbox_ll, pad_deg=float(cfg.sea.aoi_pad_deg))
-    bundle = scgraph_bridge.sc_edges_in_bbox(bbox_ll=bbox_ll_sea)  # 你現在的 adapter 會回 nodes/edges/stats
+
+    # --- dateline-safe: split bbox if needed, fetch multiple bundles, then merge ---
+    sea_bboxes = _split_bbox_dateline(bbox_ll_sea)
+    bundles = [scgraph_bridge.sc_edges_in_bbox(bbox_ll=b) for b in sea_bboxes]
+    bundle = _merge_sc_bundles(bundles)
+
     S_nodes, S_edges, G, kdt = build_sea_nodes_from_bundle(proj, bundle)
+
 
     sea_ok_set = filter_sea_nodes(
         S_nodes, G,
@@ -174,6 +245,7 @@ def build_aoi(cfg: RoutingMapConfig) -> Dict[str, Any]:
         "cfg": cfg,
         "bbox_ll": bbox_ll,
         "bbox_ll_sea": bbox_ll_sea,
+        "bbox_ll_sea_parts": sea_bboxes,
         "proj": proj,
 
         "polys_ll": polys_ll,
