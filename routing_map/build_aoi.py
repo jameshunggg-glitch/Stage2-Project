@@ -247,6 +247,7 @@ def build_aoi(cfg: RoutingMapConfig) -> Dict[str, Any]:
         "bbox_ll_sea": bbox_ll_sea,
         "bbox_ll_sea_parts": sea_bboxes,
         "proj": proj,
+        "collision_prep": collision_prep,
 
         "polys_ll": polys_ll,
         "layers": layers,
