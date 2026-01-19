@@ -405,8 +405,10 @@ class PathRepairer:
       out2 = repairer.repair_path(G, path, collision_m=out["collision_m"], proj=out["proj"])
     """
 
+
     def __init__(self, cfg: Optional[RepairConfig] = None):
         self.cfg = cfg or RepairConfig()
+
 
     def repair_path(
         self,
@@ -492,7 +494,7 @@ class PathRepairer:
 
             ll_u, ll_v = edge_ll(u, v, data)
             u_xy = ll2m((ll_u[0], ll_u[1]))
-            v_xy = ll2m((ll_u[0], ll_u[1]))
+            v_xy = ll2m((ll_v[0], ll_v[1]))
 
             seg = LineString([u_xy, v_xy])
             if not _line_intersects(prepared_collision, seg):
@@ -521,7 +523,7 @@ class PathRepairer:
 
                 # append intermediate points (excluding first, include last)
                 for p_xy in patched_xy[1:]:
-                    llp = m2ll(p_xy[0], p_xy[1])
+                    llp = m2ll((p_xy[0], p_xy[1]))
                     # make a lonlat tuple node key (consistent with your notebook)
                     node = (float(llp[0]), float(llp[1]))
                     repaired_ll.append(node)
