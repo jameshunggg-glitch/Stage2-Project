@@ -8,6 +8,10 @@ import pandas as pd
 import networkx as nx
 from collections import Counter
 
+import os
+import pickle
+from shapely.prepared import prep # 讀取後重建需要用到
+
 from shapely.geometry import LineString, box
 from shapely.ops import transform as shp_transform
 
@@ -31,41 +35,52 @@ cfg = RoutingMapConfig(
         bbox_ll=(10, -50, 150, 50),
     ),
     land=LandConfig(
+        # shp_path=Path(r"C:\Users\slab\Desktop\Slab Project\Stage1\data\Land\ne_10m_land.shp"),
         shp_path=Path(r"C:\Users\slab\Desktop\Slab Project\Stage1\data\Land\ne_10m_land.shp"),
+        
         buffer_km=20.0,
         avoid_km= 1,
         collision_safety_km=0.5,
     ),
 )
 
-out = build_aoi(cfg)
+# out = build_aoi(cfg)
 
+CACHE_FILE = "aoi_cache.pkl"
 
-import folium, webbrowser
-from pathlib import Path
-import numpy as np
-import pandas as pd
-import networkx as nx
-from collections import Counter
+# 1. 嘗試讀取快取
+if os.path.exists(CACHE_FILE):
+    print(f"[{CACHE_FILE}] 存在，正在讀取快取資料...")
+    with open(CACHE_FILE, "rb") as f:
+        out = pickle.load(f)
+    
+    # 2. 重建無法被儲存的物件 (Prepared Geometry)
+    # 因為 collision_prep 無法被 pickle，所以我們讀取後要用 layers["COLLISION_M"] 重建它
+    if "layers" in out and "COLLISION_M" in out["layers"]:
+        print("正在重建 Collision Prep 物件...")
+        out["collision_prep"] = prep(out["layers"]["COLLISION_M"])
+        
+    print("讀取完成！")
 
-from shapely.geometry import LineString, box
-from shapely.ops import transform as shp_transform
-
-# === modules ===
-from routing_map.path_simplifier import simplify_path_visibility
-from routing_map.routing_graph import build_base_graph, haversine_km
-from routing_map.c_gateb_connectors import (
-    build_cnode_gateb_connectors_nearest,
-    add_cnode_gateb_connectors_to_graph,
-)
-from routing_map.snap import snap_pair_component_aware, inject_point_edges
-from routing_map.repairer import PathRepairer, RepairConfig
-
-#  snap-link repair helper (you said it's already ready)
-from routing_map.snap_link_repair import repair_snap_link_ll_if_needed
-
-from routing_map.metrics import path_length_km_nm, format_distance
-from routing_map.snap_link_repair import repair_snap_link_ll_if_needed
+else:
+    print(f"[{CACHE_FILE}] 不存在，開始執行 build_aoi...")
+    
+    # 執行原本的建置流程
+    out = build_aoi(cfg)
+    
+    # 3. 儲存前的處理 (移除不可 pickle 的物件)
+    # 建立一個淺拷貝 (Shallow Copy)，以免影響到記憶體中正在用的 out
+    out_to_save = out.copy()
+    
+    # 移除 collision_prep，避免 pickle 報錯
+    if "collision_prep" in out_to_save:
+        del out_to_save["collision_prep"]
+    
+    # 寫入檔案
+    print(f"正在將資料儲存至 [{CACHE_FILE}] ...")
+    with open(CACHE_FILE, "wb") as f:
+        pickle.dump(out_to_save, f)
+    print("儲存完成！")
 
 
 
@@ -491,8 +506,6 @@ def open_routing_debug_map_p2p(
         inject_point_edges(G, start_key, pair.start_pick, k_inject=int(k_inject), etype="start_inject")
         inject_point_edges(G, end_key,   pair.end_pick,   k_inject=int(k_inject), etype="end_inject")
         print("[snap] OK:", pair.reason, pair.debug)
-        print("[snap][start] local_entrance_aug:", pair.start.debug.get("local_entrance_aug"))
-        print("[snap][end  ] local_entrance_aug:", pair.end.debug.get("local_entrance_aug"))
 
         # --- A* ---
         try:
@@ -628,7 +641,6 @@ def open_routing_debug_map_p2p(
                     path_ll_for_simplify = path_ll
 
                 # simplify
-                # simplify
                 if do_simplify and path_ll_for_simplify is not None and len(path_ll_for_simplify) >= 2:
                     path_simplified, simp_stats = simplify_path_visibility(
                         path_ll_for_simplify,
@@ -722,7 +734,6 @@ def open_routing_debug_map_p2p(
                         print("[distance] skip: no final polyline")
                 else:
                     print("[simplify] skip")
-                
 
     # ---------------------------
     # folium map + layers
@@ -884,7 +895,7 @@ def open_routing_debug_map_p2p(
             path_su = route_polyline_dateline_safe([(float(p[0]), float(p[1])) for p in path_simplified])
             folium.PolyLine([[p[1], p[0]] for p in path_su], color="#ff7f0e", weight=5, opacity=0.95).add_to(fgS)
             fgS.add_to(m)
-        
+            
         # --- FINAL route (with snap-links) ---
         if final_ll is not None and len(final_ll) >= 2:
             fgF = folium.FeatureGroup(name="Route: FINAL (simplified + snap-links)", show=True)
@@ -896,30 +907,291 @@ def open_routing_debug_map_p2p(
 
     html_path = Path(html_path).resolve()
     m.save(str(html_path))
-    webbrowser.open(html_path.as_uri())
+    # webbrowser.open(html_path.as_uri())
     return html_path
 
 
 # =========================
 # === call
 # =========================
-origin_ll = (128.52636, -30.38197)
-dest_ll   = (119.82013, 13.85607)
+origin_ll = (120.325625, 22.548649)    #(127.09912, 13.3102)
+dest_ll   = (135.134173, 34.200334)    # (17.47887, 42.36624)
 
-open_routing_debug_map_p2p(
-    out,
-    origin_ll=origin_ll,
-    dest_ll=dest_ll,
-    html_path="aoi_p2p_map.html",
-    zoom_start=5,
-    include_sea=True,
-    include_cc=True,
-    include_gateb_sea=True,
-    use_c_gateb_bridge=True,
-    c_to_gateB_max_deg_dist=None,
-    k_near=30,
-    r_max_km_snap=150,
-    k_inject=4,
-    do_repair=True,
-    do_simplify=True,
-)
+# open_routing_debug_map_p2p(
+#     out,
+#     origin_ll=origin_ll,
+#     dest_ll=dest_ll,
+#     html_path="aoi_p2p_map.html",
+#     zoom_start=5,
+#     include_sea=True,
+#     include_cc=True,
+#     include_gateb_sea=True,
+#     use_c_gateb_bridge=True,
+#     c_to_gateB_max_deg_dist=None,
+#     k_near=30,
+#     r_max_km_snap=150,
+#     k_inject=4,
+#     do_repair=True,
+#     do_simplify=True,
+# )
+
+# ==========================================
+# === 以下為新增的 UI 程式碼 (請貼在原檔最下方) ===
+# ==========================================
+import sys
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
+                             QHBoxLayout, QLabel, QLineEdit, QPushButton, 
+                             QTextEdit, QFrame)
+from PyQt6.QtCore import QUrl
+from PyQt6.QtWebEngineWidgets import QWebEngineView
+
+class RoutingDemoApp(QMainWindow):
+    def __init__(self, routing_data_out):
+        super().__init__()
+        self.setWindowTitle("Slab Routing Demo - Local UI")
+        self.resize(1920, 1080) # 設定 FHD 初始大小
+        
+        # 保存預先計算好的 AOI 資料 (out)
+        self.out = routing_data_out
+        
+        # 預設座標 (範例)
+        self.default_origin = "120.325625, 22.548649"
+        self.default_dest = "135.134173, 34.200334"
+
+        # 初始化 UI
+        self.init_ui()
+
+    def init_ui(self):
+        # 主容器
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        
+        # 主佈局：水平分割 (左：控制面板, 右：地圖)
+        main_layout = QHBoxLayout(central_widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+
+        # --- 左側控制面板 (15%) ---
+        left_panel = QFrame()
+        #left_panel.setStyleSheet("background-color: #f0f0f0; border-right: 1px solid #ccc;")
+        left_panel.setStyleSheet("""
+            QFrame {
+                background-color: #2b2f36;
+                border-right: 1px solid #3a404a;
+                color: #e6e6e6;
+            }
+            QLabel { color: #e6e6e6; }
+            QLineEdit, QTextEdit {
+                background-color: #1f2329;
+                color: #e6e6e6;
+                border: 1px solid #3a404a;
+                border-radius: 4px;
+                padding: 6px;
+                selection-background-color: #3d6fb6;
+            }
+        """)
+
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(20, 20, 20, 20)
+        left_layout.setSpacing(15)
+
+        # 標題
+        title_label = QLabel("<h2>Routing Control</h2>")
+        left_layout.addWidget(title_label)
+
+        # Origin 輸入
+        left_layout.addWidget(QLabel("<b>Origin (Lon, Lat):</b>"))
+        self.input_origin = QLineEdit(self.default_origin)
+        self.input_origin.setPlaceholderText("Lon, Lat")
+        left_layout.addWidget(self.input_origin)
+
+        # Destination 輸入
+        left_layout.addWidget(QLabel("<b>Destination (Lon, Lat):</b>"))
+        self.input_dest = QLineEdit(self.default_dest)
+        self.input_dest.setPlaceholderText("Lon, Lat")
+        left_layout.addWidget(self.input_dest)
+
+        # 計算按鈕
+        self.btn_calc = QPushButton("Calculate Route")
+        self.btn_calc.setStyleSheet("""
+            QPushButton {
+                background-color: #007bff; color: white; 
+                font-weight: bold; padding: 10px; border-radius: 5px;
+            }
+            QPushButton:hover { background-color: #0056b3; }
+        """)
+        self.btn_calc.clicked.connect(self.run_routing)
+        left_layout.addWidget(self.btn_calc)
+
+        # 訊息輸出框 (Log)
+        left_layout.addWidget(QLabel("<b>Status Log:</b>"))
+        self.log_box = QTextEdit()
+        self.log_box.setReadOnly(True)
+        left_layout.addWidget(self.log_box)
+
+        # 底部填充 (讓元件靠上)
+        left_layout.addStretch()
+        
+        # 分隔線
+        # from PyQt6.QtWidgets import QFrame
+        line = QFrame()
+        line.setFrameShape(QFrame.Shape.HLine)
+        line.setFrameShadow(QFrame.Shadow.Sunken)
+        left_layout.addWidget(line)
+
+        # 離開按鈕
+        self.btn_exit = QPushButton("Exit Demo")
+        self.btn_exit.setStyleSheet("""
+            QPushButton {
+                background-color: #dc3545; color: white; 
+                font-weight: bold; padding: 10px; border-radius: 5px;
+            }
+            QPushButton:hover { background-color: #c82333; }
+        """)
+        # 連接到視窗的 close() 方法
+        self.btn_exit.clicked.connect(self.close)
+        left_layout.addWidget(self.btn_exit)
+
+        # --- 右側地圖視窗 (85%) ---
+        self.web_view = QWebEngineView()
+        
+        # === 新增設定：允許本地檔案存取遠端資源 & 開啟 JavaScript ===
+        from PyQt6.QtWebEngineCore import QWebEngineSettings
+        settings = self.web_view.settings()
+        settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True)
+        settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
+        # =======================================================
+        
+        # 預設先顯示空白或說明
+        self.web_view.setHtml("<html><body style='display:flex;justify-content:center;align-items:center;height:100%;font-family:sans-serif;color:#555;'><h1>Please Click Calculate</h1></body></html>")
+
+        # --- 加入主佈局並設定比例 ---
+        main_layout.addWidget(left_panel, stretch=15) # 左邊 15%
+        main_layout.addWidget(self.web_view, stretch=85) # 右邊 85%
+
+    def log(self, message):
+        self.log_box.append(f">> {message}")
+        # 強制刷新 UI 以顯示 log
+        QApplication.processEvents()
+
+    def parse_latlon(self, text):
+        try:
+            parts = text.split(',')
+            if len(parts) != 2:
+                raise ValueError
+            lon = float(parts[0].strip())
+            lat = float(parts[1].strip())
+            return (lon, lat)
+        except:
+            return None
+
+    def run_routing(self):
+        # 1. 取得輸入
+        origin_str = self.input_origin.text()
+        dest_str = self.input_dest.text()
+        
+        origin_ll = self.parse_latlon(origin_str)
+        dest_ll = self.parse_latlon(dest_str)
+
+        if not origin_ll or not dest_ll:
+            self.log("Error: Invalid Coordinate Format. Use 'lon, lat'")
+            return
+
+        self.log(f"Computing route...")
+        self.log(f"From: {origin_ll}")
+        self.log(f"To:   {dest_ll}")
+        self.btn_calc.setEnabled(False) # 鎖定按鈕避免重複點擊
+
+        try:
+            # 2. 呼叫原本的 Routing 函式
+            # 注意：這裡呼叫您原本定義的函式 open_routing_debug_map_p2p
+            # 為了避免它自動開啟瀏覽器，我們稍微依賴它產生的檔案，
+            # 建議您在原函式把 webbrowser.open 註解掉，或者就讓它開著也沒關係，這裡我們會重新載入。
+            
+            output_html = "aoi_p2p_map_ui.html" # 指定一個專用的檔名以免衝突
+            
+            # 呼叫邏輯 (傳入 out 與座標)
+            generated_path = open_routing_debug_map_p2p(
+                self.out,
+                origin_ll=origin_ll,
+                dest_ll=dest_ll,
+                html_path=output_html, # 覆寫檔名
+                zoom_start=5,
+                include_sea=True,
+                include_cc=True,
+                include_gateb_sea=True,
+                use_c_gateb_bridge=True,
+                c_to_gateB_max_deg_dist=None,
+                k_near=30,
+                r_max_km_snap=150,
+                k_inject=4,
+                do_repair=True,
+                do_simplify=True,
+            )
+            
+            self.log(f"Map generated: {generated_path}")
+
+            # 3. 將生成的 HTML 載入右側 WebView
+            # 必須使用絕對路徑
+            file_path = str(Path(generated_path).resolve())
+            self.web_view.setUrl(QUrl.fromLocalFile(file_path))
+            
+            self.log("Display updated.")
+
+        except Exception as e:
+            self.log(f"Error during calculation: {str(e)}")
+            import traceback
+            traceback.print_exc()
+        
+        finally:
+            self.btn_calc.setEnabled(True)
+            
+    def closeEvent(self, event):
+        """
+        當使用者按下視窗右上角的 X 或介面上的 Exit 按鈕時，會觸發此事件。
+        我們在這裡詢問是否確定離開，並清理暫存檔案。
+        """
+        from PyQt6.QtWidgets import QMessageBox
+        
+        # 1. (選用) 跳出確認視窗
+        reply = QMessageBox.question(self, 'Exit Confirmation',
+                                     "Are you sure you want to quit?",
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                     QMessageBox.StandardButton.No)
+
+        if reply == QMessageBox.StandardButton.Yes:
+            # 2. 清理暫存的 HTML 檔案
+            import os
+            temp_file = "aoi_p2p_map_ui.html"
+            if os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                    print(f"Cleaned up temporary file: {temp_file}")
+                except Exception as e:
+                    print(f"Warning: Could not delete temp file: {e}")
+            
+            # 接受關閉事件 (程式結束)
+            event.accept()
+        else:
+            # 取消關閉 (回到視窗)
+            event.ignore()
+
+# ==========================================
+# === 主程式進入點修改 ===
+# ==========================================
+
+if __name__ == "__main__":
+    # 這裡假設您的 main_disassembly.py 上方已經跑完了資料讀取 (out = ...)
+    # 如果 out 還沒讀取，請確保上面的程式碼有執行到 out = pickle.load(...) 或是 build_aoi(...)
+    
+    print("啟動 UI...")
+    
+    # 建立 Qt Application
+    app = QApplication(sys.argv)
+    
+    # 建立視窗並傳入已讀取的資料 out
+    window = RoutingDemoApp(out)
+    window.show()
+    
+    # 執行主迴圈
+    sys.exit(app.exec())

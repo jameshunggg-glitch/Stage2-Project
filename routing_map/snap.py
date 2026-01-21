@@ -25,6 +25,35 @@ def normalize_lonlat(p: LonLat) -> LonLat:
     return (lon, lat)
 
 
+def unwrap_lon(lon: float, ref_lon: float) -> float:
+    lon = float(lon)
+    ref_lon = float(ref_lon)
+    d = lon - ref_lon
+    if d > 180.0:
+        lon -= 360.0
+    if d < -180.0:
+        lon += 360.0
+    return lon
+
+
+def bearing_deg(a: LonLat, b: LonLat) -> float:
+    """Initial bearing from a->b in degrees [0,360)."""
+    lon1, lat1 = np.deg2rad(float(a[0])), np.deg2rad(float(a[1]))
+    lon2, lat2 = np.deg2rad(float(b[0])), np.deg2rad(float(b[1]))
+    dlon = lon2 - lon1
+    y = np.sin(dlon) * np.cos(lat2)
+    x = np.cos(lat1) * np.sin(lat2) - np.sin(lat1) * np.cos(lat2) * np.cos(dlon)
+    brng = np.rad2deg(np.arctan2(y, x))
+    brng = (brng + 360.0) % 360.0
+    return float(brng)
+
+
+def ang_diff_deg(a_deg: float, b_deg: float) -> float:
+    """Smallest absolute difference between two angles (deg) in [0,180]."""
+    d = (float(a_deg) - float(b_deg) + 180.0) % 360.0 - 180.0
+    return float(abs(d))
+
+
 def _get_proj(out: Dict[str, Any]):
     proj = out.get("proj", None)
     if proj is None:
@@ -93,6 +122,172 @@ def _kdt_query_indices(kdt, x: float, y: float, k: int):
 
 
 # -------------------------
+# Sea adjacency for local entrance augmentation
+# -------------------------
+def _get_or_build_sea_adjacency(out: Dict[str, Any]) -> Dict[int, List[int]]:
+    """
+    Build adjacency list for S_nodes indices using out["S_edges"].
+
+    Supports S_edges endpoints as:
+      - (i, j) integer indices
+      - ((lon,lat),(lon,lat)) tuples
+      - ("lon,lat","lon,lat") strings
+    """
+    if isinstance(out.get("sea_adj", None), dict):
+        return out["sea_adj"]
+
+    S_nodes = out.get("S_nodes", None)
+    S_edges = out.get("S_edges", None)
+    if not isinstance(S_nodes, pd.DataFrame) or S_edges is None:
+        out["sea_adj"] = {}
+        return out["sea_adj"]
+
+    n = len(S_nodes)
+    # map lon/lat -> idx (rounded to match edge precision)
+    ll2idx = {}
+    for i, r in S_nodes.reset_index(drop=True).iterrows():
+        try:
+            key = (round(float(r["lon"]), 6), round(float(r["lat"]), 6))
+            ll2idx[key] = int(i)
+        except Exception:
+            continue
+
+    def parse_ll(obj):
+        # ((lon,lat),) or (lon,lat)
+        if isinstance(obj, (list, tuple)) and len(obj) >= 2:
+            try:
+                return (float(obj[0]), float(obj[1]))
+            except Exception:
+                return None
+        # "lon,lat"
+        if isinstance(obj, str) and "," in obj:
+            try:
+                a, b = obj.split(",")
+                return (float(a), float(b))
+            except Exception:
+                return None
+        return None
+
+    adj: Dict[int, List[int]] = {}
+
+    def add(u: int, v: int):
+        adj.setdefault(u, []).append(v)
+
+    for e in S_edges:
+        try:
+            if not isinstance(e, (list, tuple)) or len(e) < 2:
+                continue
+            a, b = e[0], e[1]
+
+            # case1: indices
+            if isinstance(a, (int, np.integer)) and isinstance(b, (int, np.integer)):
+                u, v = int(a), int(b)
+            else:
+                # case2: lonlat endpoints
+                a_ll = parse_ll(a)
+                b_ll = parse_ll(b)
+                if a_ll is None or b_ll is None:
+                    continue
+                ua = ll2idx.get((round(a_ll[0], 6), round(a_ll[1], 6)))
+                vb = ll2idx.get((round(b_ll[0], 6), round(b_ll[1], 6)))
+                if ua is None or vb is None:
+                    continue
+                u, v = int(ua), int(vb)
+
+            if u < 0 or v < 0 or u >= n or v >= n:
+                continue
+            add(u, v)
+            add(v, u)
+        except Exception:
+            continue
+
+    out["sea_adj"] = adj
+    return adj
+
+
+
+def _interp_lonlat(a: LonLat, b: LonLat, t: float) -> LonLat:
+    """Linear interpolation in lon/lat with simple dateline-safe lon unwrap."""
+    lon1, lat1 = float(a[0]), float(a[1])
+    lon2, lat2 = float(b[0]), float(b[1])
+    lon2u = unwrap_lon(lon2, lon1)
+    lon = lon1 + float(t) * (lon2u - lon1)
+    lat = lat1 + float(t) * (lat2 - lat1)
+    return normalize_lonlat((lon, lat))
+
+
+def _virtual_candidates_from_seed_node(
+    out: Dict[str, Any],
+    *,
+    seed_idx: int,
+    p_used_ll: LonLat,
+    component: Optional[int],
+    max_neighbors: int = 12,
+    t_samples: Sequence[float] = (0.5, 1.0 / 3.0, 2.0 / 3.0),
+    round_ndigits: int = 6,
+) -> List["SnapCandidate"]:
+    """
+    Create virtual sea candidates by sampling points along sea edges adjacent to seed_idx.
+    These points are ONLY used for injection; they do not exist in the base sea graph.
+    """
+    S_nodes: pd.DataFrame = out.get("S_nodes")
+    adj = _get_or_build_sea_adjacency(out)
+    if not isinstance(S_nodes, pd.DataFrame) or len(S_nodes) == 0:
+        return []
+
+    if seed_idx not in adj:
+        return []
+
+    try:
+        a_ll = (float(S_nodes.iloc[int(seed_idx)]["lon"]), float(S_nodes.iloc[int(seed_idx)]["lat"]))
+    except Exception:
+        return []
+
+    nbrs = adj.get(seed_idx, [])
+    if not nbrs:
+        return []
+
+    # cap neighbors for compute
+    nbrs = nbrs[: max(0, int(max_neighbors))]
+
+    out_cands: List[SnapCandidate] = []
+    seen = set()
+
+    vid = -10_000_000  # negative ids for virtual
+    for j in nbrs:
+        try:
+            b_ll = (float(S_nodes.iloc[int(j)]["lon"]), float(S_nodes.iloc[int(j)]["lat"]))
+        except Exception:
+            continue
+
+        for t in t_samples:
+            try:
+                p_ll = _interp_lonlat(a_ll, b_ll, float(t))
+                key = (round(p_ll[0], round_ndigits), round(p_ll[1], round_ndigits))
+                if key in seen:
+                    continue
+                seen.add(key)
+
+                d_km = float(haversine_km(p_used_ll, p_ll))
+                cand = SnapCandidate(
+                    node_idx=int(vid),
+                    node_ll=(float(p_ll[0]), float(p_ll[1])),
+                    dist_km=d_km,
+                    component=(int(component) if component is not None else None),
+                    ok=True,
+                )
+                # attach bridge endpoints so inject can connect it back to the sea graph
+                cand._virtual_bridge = {"u_ll": a_ll, "v_ll": b_ll}
+                out_cands.append(cand)
+                vid -= 1
+            except Exception:
+                continue
+
+    out_cands.sort(key=lambda c: c.dist_km)
+    return out_cands
+
+
+# -------------------------
 # Coastal KDTree helpers
 # -------------------------
 def _get_coast_nodes_df(out):
@@ -125,9 +320,11 @@ def _get_or_build_coast_kdt(out):
     # KDTree (prefer sklearn, fallback scipy)
     try:
         from sklearn.neighbors import KDTree  # type: ignore
+
         kdt = KDTree(xy, leaf_size=40)
     except Exception:
         from scipy.spatial import cKDTree  # type: ignore
+
         kdt = cKDTree(xy)
 
     out["coast_xy_m"] = xy
@@ -185,199 +382,6 @@ def nudge_to_nearest_coastal_node(
 
     cand, d_km, idx = best
     return normalize_lonlat(cand), True, {"inside": True, "picked_idx": idx, "dist_km": d_km}
-
-
-# -------------------------
-# GateB KDTree + rank0 info helpers
-# -------------------------
-def _get_or_build_gateb_kdt(out):
-    """
-    Build & cache:
-    - gateb_df: Gate_B_kept_gates dataframe
-    - gateb_kdt: KDTree over gateb xy_m
-    - gate_uid -> (lon,lat,g_id)
-    - gate_uid -> reachable sea components set (via connectors->sea_idx->S_nodes.component)
-    """
-    if (
-        out.get("gateb_kdt") is not None
-        and out.get("gateb_uid_to_ll") is not None
-        and out.get("gateb_uid_to_comps") is not None
-        and out.get("gateb_uid_to_gid") is not None
-    ):
-        return out["gateb_kdt"], out["gateb_uid_to_ll"], out["gateb_uid_to_comps"], out["gateb_uid_to_gid"]
-
-    gate_df = out.get("Gate_B_kept_gates", None)
-    conn_df = out.get("gateB_connectors", None)
-    S_nodes = out.get("S_nodes", None)
-
-    if gate_df is None or conn_df is None or S_nodes is None:
-        return None, None, None, None
-    if not (hasattr(gate_df, "columns") and hasattr(conn_df, "columns") and hasattr(S_nodes, "columns")):
-        return None, None, None, None
-
-    need_gate = {"gate_uid", "lon", "lat", "g_id"}
-    need_conn = {"gate_uid", "sea_idx"}
-    if not need_gate.issubset(set(gate_df.columns)) or not need_conn.issubset(set(conn_df.columns)):
-        return None, None, None, None
-    if "component" not in S_nodes.columns:
-        return None, None, None, None
-
-    proj = _get_proj(out)
-
-    # gate_uid -> ll, g_id
-    uid_to_ll: Dict[int, LonLat] = {}
-    uid_to_gid: Dict[int, int] = {}
-    for _, r in gate_df.iterrows():
-        uid = int(r["gate_uid"])
-        uid_to_ll[uid] = (float(r["lon"]), float(r["lat"]))
-        uid_to_gid[uid] = int(r["g_id"])
-
-    # build KDTree on gate points (metric)
-    uids_list = list(uid_to_ll.keys())
-    xs = np.array([uid_to_ll[uid][0] for uid in uids_list], dtype=float)
-    ys = np.array([uid_to_ll[uid][1] for uid in uids_list], dtype=float)
-    xm, ym = proj.to_m.transform(xs, ys)
-    xy = np.column_stack([np.asarray(xm, dtype=float), np.asarray(ym, dtype=float)])
-
-    uids = np.array(uids_list, dtype=int)  # index -> gate_uid
-
-    try:
-        from sklearn.neighbors import KDTree  # type: ignore
-        kdt = KDTree(xy, leaf_size=40)
-    except Exception:
-        from scipy.spatial import cKDTree  # type: ignore
-        kdt = cKDTree(xy)
-
-    # gate_uid -> reachable components
-    uid_to_comps: Dict[int, set] = {}
-    for uid, g in conn_df.groupby("gate_uid"):
-        uid = int(uid)
-        sea_idxs = g["sea_idx"].astype(int).tolist()
-        comps = set(int(S_nodes.iloc[i]["component"]) for i in sea_idxs if 0 <= i < len(S_nodes))
-        if len(comps) > 0:
-            uid_to_comps[uid] = comps
-
-    # cache
-    out["gateb_kdt"] = (kdt, xy, uids)  # store uids array too
-    out["gateb_uid_to_ll"] = uid_to_ll
-    out["gateb_uid_to_gid"] = uid_to_gid
-    out["gateb_uid_to_comps"] = uid_to_comps
-
-    return out["gateb_kdt"], uid_to_ll, uid_to_comps, uid_to_gid
-
-
-def _get_gateb_rank0_map(out: Dict[str, Any]) -> Dict[int, Tuple[int, Optional[int]]]:
-    """
-    Build & cache gate_uid -> (rank0_sea_idx, rank0_component).
-    rank0 = smallest 'rank' if present; else smallest dist_km.
-    """
-    if out.get("gateb_uid_to_rank0", None) is not None:
-        return out["gateb_uid_to_rank0"]
-
-    conn_df = out.get("gateB_connectors", None)
-    S_nodes = out.get("S_nodes", None)
-    if conn_df is None or S_nodes is None:
-        out["gateb_uid_to_rank0"] = {}
-        return out["gateb_uid_to_rank0"]
-
-    if not (hasattr(conn_df, "columns") and hasattr(S_nodes, "columns")):
-        out["gateb_uid_to_rank0"] = {}
-        return out["gateb_uid_to_rank0"]
-
-    if "gate_uid" not in conn_df.columns or "sea_idx" not in conn_df.columns:
-        out["gateb_uid_to_rank0"] = {}
-        return out["gateb_uid_to_rank0"]
-
-    has_rank = "rank" in conn_df.columns
-    has_dist = "dist_km" in conn_df.columns
-    has_comp = "component" in S_nodes.columns
-
-    m: Dict[int, Tuple[int, Optional[int]]] = {}
-    for uid, g in conn_df.groupby("gate_uid"):
-        uid = int(uid)
-        gg = g.copy()
-        if has_rank:
-            gg = gg.sort_values(["rank", "dist_km"] if has_dist else ["rank"], ascending=True)
-        elif has_dist:
-            gg = gg.sort_values(["dist_km"], ascending=True)
-
-        if len(gg) == 0:
-            continue
-
-        sea_idx = int(gg.iloc[0]["sea_idx"])
-        comp = None
-        if has_comp and 0 <= sea_idx < len(S_nodes):
-            try:
-                comp = int(S_nodes.iloc[sea_idx]["component"])
-            except Exception:
-                comp = None
-        m[uid] = (sea_idx, comp)
-
-    out["gateb_uid_to_rank0"] = m
-    return m
-
-
-def gateb_candidates_from_coastal(
-    out: Dict[str, Any],
-    coastal_ll: LonLat,
-    *,
-    k_near_gateb: int = 30,
-    r_max_km_gateb: float = 200.0,
-    require_connectors: bool = True,
-) -> List[Dict[str, Any]]:
-    """
-    Given a coastal point (lon,lat), find nearby GateB that can connect to sea components.
-
-    Returns list of dicts:
-      {
-        gate_uid, g_id, gate_ll, dist_km,
-        rank0_sea_idx, component, comps:set[int]
-      }
-    """
-    res: List[Dict[str, Any]] = []
-
-    pack, uid_to_ll, uid_to_comps, uid_to_gid = _get_or_build_gateb_kdt(out)
-    if pack is None:
-        return res
-
-    (kdt, _xy, uids) = pack
-    x, y = _point_ll_to_m(out, coastal_ll)
-
-    idxs = _kdt_query_indices(kdt, x, y, k=min(int(k_near_gateb), len(uids)))
-
-    uid_to_rank0 = _get_gateb_rank0_map(out)
-
-    for j in idxs:
-        uid = int(uids[int(j)])
-        gate_ll = uid_to_ll.get(uid)
-        if gate_ll is None:
-            continue
-        d_km = float(haversine_km(coastal_ll, gate_ll))
-        if d_km > float(r_max_km_gateb):
-            continue
-
-        comps = uid_to_comps.get(uid, set())
-        if require_connectors and len(comps) == 0:
-            continue
-
-        rank0 = uid_to_rank0.get(uid, None)
-        rank0_sea_idx = int(rank0[0]) if rank0 is not None else None
-        rank0_comp = rank0[1] if rank0 is not None else None
-
-        res.append(
-            {
-                "gate_uid": uid,
-                "g_id": int(uid_to_gid.get(uid, -1)),
-                "gate_ll": gate_ll,
-                "dist_km": d_km,
-                "rank0_sea_idx": rank0_sea_idx,
-                "component": rank0_comp,
-                "comps": comps,
-            }
-        )
-
-    res.sort(key=lambda r: float(r["dist_km"]))
-    return res
 
 
 # -------------------------
@@ -507,206 +511,8 @@ def nudge_out_of_collision(
 
 
 # -------------------------
-# Snap decision tree (Improved)
+# Core: sea-first candidate selection (with local entrance augmentation)
 # -------------------------
-def snap_to_sea_candidates(
-    out: Dict[str, Any],
-    p_ll: LonLat,
-    *,
-    k_near: int = 30,
-    r_max_km: float = 150.0,
-    prefer_ok_set: bool = True,
-    allow_fallback_non_ok: bool = True,
-    allow_radius_fallback: bool = True,
-    r_fallback_km: Optional[float] = None,
-    do_nudge: bool = True,
-    # coastal nudge params
-    k_near_coast: int = 80,
-    r_max_km_coast: Optional[float] = None,
-    # gateB params (used only in collision mode)
-    k_near_gateb: int = 30,
-    r_max_km_gateb: float = 200.0,
-    gateb_debug_topn: int = 10,
-) -> SnapResult:
-    """
-    改良版決策樹：
-    - 若點不在 collision：原本 sea-first（找 sea candidates）
-    - 若點在 collision 且 do_nudge=True：
-        1) 先 nudge 到 coastal node（合法）
-        2) 從 coastal 找 GateB candidates（必須有 connectors）
-        3) 回傳 candidates=GateB（含 g_id/gate_uid、rank0 sea_idx、component）
-        4) 若 GateB candidates 找不到 -> fallback 回 sea-first（從 coastal 點去找 sea nodes）
-    """
-    p_ll0 = normalize_lonlat(p_ll)
-    dbg: Dict[str, Any] = {}
-
-    # Needed objects for sea-first
-    S_nodes = out.get("S_nodes", None)
-    sea_kdt = out.get("sea_kdt", None)
-    sea_ok_set = out.get("sea_ok_set", None)
-
-    if S_nodes is None or sea_kdt is None:
-        return SnapResult(
-            p_input_ll=p_ll0,
-            p_used_ll=p_ll0,
-            was_nudged=False,
-            in_collision_input=False,
-            candidates=[],
-            reason="missing_S_nodes_or_sea_kdt",
-            debug={"has_S_nodes": S_nodes is not None, "has_kdt": sea_kdt is not None},
-        )
-
-    # collision check
-    collision_prep = None
-    geom_m = _get_collision_geom_m(out)
-    if geom_m is not None:
-        collision_prep = prep(geom_m)
-
-    in_collision = _is_in_collision(out, p_ll0, collision_prep=collision_prep) if geom_m is not None else False
-
-    # -------------------------
-    # CASE 1) Not in collision -> normal sea-first
-    # -------------------------
-    if (not in_collision) or (not do_nudge) or (geom_m is None):
-        dbg["mode"] = "sea_first"
-        return _sea_first_candidates(
-            out,
-            p_input_ll=p_ll0,
-            p_used_ll=p_ll0,
-            was_nudged=False,
-            in_collision_input=in_collision,
-            S_nodes=S_nodes,
-            sea_kdt=sea_kdt,
-            sea_ok_set=sea_ok_set,
-            k_near=k_near,
-            r_max_km=r_max_km,
-            prefer_ok_set=prefer_ok_set,
-            allow_fallback_non_ok=allow_fallback_non_ok,
-            allow_radius_fallback=allow_radius_fallback,
-            r_fallback_km=r_fallback_km,
-            extra_debug=dbg,
-        )
-
-    # -------------------------
-    # CASE 2) In collision -> coast -> GateB -> sea
-    # -------------------------
-    dbg["mode"] = "coast_gateb"
-
-    # 2.1 nudge to coastal
-    p_coast, ok_coast, dbg_coast = nudge_to_nearest_coastal_node(
-        out,
-        p_ll0,
-        k_near=int(k_near_coast),
-        r_max_km=float(r_max_km if r_max_km_coast is None else r_max_km_coast),
-        collision_prep=collision_prep,
-    )
-
-    dbg["chosen_coastal"] = {
-        "ok": bool(ok_coast),
-        "p_coast_ll": (float(p_coast[0]), float(p_coast[1])),
-        **(dbg_coast if isinstance(dbg_coast, dict) else {"dbg": str(dbg_coast)}),
-    }
-
-    # If coastal nudge fails, fallback to boundary nudge then sea-first
-    if not ok_coast:
-        dbg["fallback_reason"] = "coastal_nudge_failed"
-        p_b, ok_b, dbg_b = nudge_out_of_collision(out, p_ll0, collision_prep=collision_prep)
-        dbg["boundary_fallback"] = {"ok": bool(ok_b), **(dbg_b if isinstance(dbg_b, dict) else {"dbg": str(dbg_b)})}
-
-        return _sea_first_candidates(
-            out,
-            p_input_ll=p_ll0,
-            p_used_ll=p_b,
-            was_nudged=bool(ok_b),
-            in_collision_input=True,
-            S_nodes=S_nodes,
-            sea_kdt=sea_kdt,
-            sea_ok_set=sea_ok_set,
-            k_near=k_near,
-            r_max_km=r_max_km,
-            prefer_ok_set=prefer_ok_set,
-            allow_fallback_non_ok=allow_fallback_non_ok,
-            allow_radius_fallback=allow_radius_fallback,
-            r_fallback_km=r_fallback_km,
-            extra_debug=dbg,
-        )
-
-    # 2.2 gateB candidates from coastal
-    gateb_rows = gateb_candidates_from_coastal(
-        out,
-        p_coast,
-        k_near_gateb=int(k_near_gateb),
-        r_max_km_gateb=float(r_max_km_gateb),
-        require_connectors=True,
-    )
-
-    # debug gateB list
-    topn = max(0, int(gateb_debug_topn))
-    dbg["chosen_gateB_list"] = [
-        {
-            "gate_uid": int(r.get("gate_uid", -1)),
-            "g_id": int(r.get("g_id", -1)),
-            "dist_km": float(r.get("dist_km", np.nan)),
-            "rank0_sea_idx": (None if r.get("rank0_sea_idx", None) is None else int(r["rank0_sea_idx"])),
-            "component": (None if r.get("component", None) is None else int(r["component"])),
-        }
-        for r in gateb_rows[:topn]
-    ]
-
-    # 2.3 If gateB exists: return GateB candidates (NOT sea nodes)
-    if len(gateb_rows) > 0:
-        cands_gateb: List[SnapCandidate] = []
-        for r in gateb_rows:
-            uid = int(r["gate_uid"])
-            gate_ll = r["gate_ll"]
-            d_km = float(r["dist_km"])
-            comp = r.get("component", None)
-            comp_int = int(comp) if comp is not None else None
-
-            # GateB candidate: node_idx use gate_uid (stable)
-            cands_gateb.append(
-                SnapCandidate(
-                    node_idx=uid,
-                    node_ll=(float(gate_ll[0]), float(gate_ll[1])),
-                    dist_km=d_km,
-                    component=comp_int,
-                    ok=True,
-                )
-            )
-
-        cands_gateb.sort(key=lambda c: c.dist_km)
-
-        return SnapResult(
-            p_input_ll=p_ll0,
-            p_used_ll=p_coast,             # IMPORTANT: inject point should be coastal
-            was_nudged=True,
-            in_collision_input=True,
-            candidates=cands_gateb,
-            reason="coast_gateb_candidates",
-            debug=dbg,
-        )
-
-    # 2.4 No gateB candidates -> fallback to sea-first (from coastal)
-    dbg["fallback_reason"] = "no_gateb_candidates"
-    return _sea_first_candidates(
-        out,
-        p_input_ll=p_ll0,
-        p_used_ll=p_coast,
-        was_nudged=True,
-        in_collision_input=True,
-        S_nodes=S_nodes,
-        sea_kdt=sea_kdt,
-        sea_ok_set=sea_ok_set,
-        k_near=k_near,
-        r_max_km=r_max_km,
-        prefer_ok_set=prefer_ok_set,
-        allow_fallback_non_ok=allow_fallback_non_ok,
-        allow_radius_fallback=allow_radius_fallback,
-        r_fallback_km=r_fallback_km,
-        extra_debug=dbg,
-    )
-
-
 def _sea_first_candidates(
     out: Dict[str, Any],
     *,
@@ -723,16 +529,25 @@ def _sea_first_candidates(
     allow_fallback_non_ok: bool,
     allow_radius_fallback: bool,
     r_fallback_km: Optional[float],
+    # routing-aware trigger target
+    target_ll: Optional[LonLat] = None,
+    # local entrance augmentation controls
+    enable_local_entrance_aug: bool = True,
+    aug_dist_trigger_km: float = 60.0,
+    aug_delta_end_km: float = 120.0,
+    aug_angle_trigger_deg: float = 110.0,
+    aug_seed_neighbors_cap: int = 12,
+    aug_seed_count: int = 1,
     extra_debug: Optional[Dict[str, Any]] = None,
 ) -> SnapResult:
     """
-    Original sea-first candidate selection (refactored out for reuse).
-    p_used_ll is the point we query sea_kdt from (can be original, coastal, or boundary-nudged).
+    Sea-first candidate selection. Optionally augments candidates by sampling points on adjacent sea edges
+    around the nearest sea node when it looks "bad" (often causes V-shape detours).
     """
     dbg = extra_debug if isinstance(extra_debug, dict) else {}
     dbg.setdefault("mode", "sea_first")
 
-    # query
+    # query nearest sea nodes from p_used_ll
     x, y = _point_ll_to_m(out, p_used_ll)
     kq = max(1, int(k_near))
     try:
@@ -748,14 +563,6 @@ def _sea_first_candidates(
             debug={**dbg, "error": repr(e)},
         )
 
-    # decide radius fallback
-    if r_fallback_km is None:
-        cfg = out.get("cfg", None)
-        try:
-            r_fallback_km = float(getattr(getattr(cfg, "sea"), "r_max_km"))
-        except Exception:
-            r_fallback_km = float(r_max_km)
-
     def make_candidate(i: int) -> SnapCandidate:
         row = S_nodes.iloc[int(i)]
         ll = (float(row["lon"]), float(row["lat"]))
@@ -770,12 +577,113 @@ def _sea_first_candidates(
             ok = (int(i) in sea_ok_set)
         return SnapCandidate(node_idx=int(i), node_ll=ll, dist_km=dist, component=comp, ok=ok)
 
-    cands_all = [make_candidate(i) for i in idxs]
+    cands_all: List[SnapCandidate] = [make_candidate(i) for i in idxs]
+    cands_all.sort(key=lambda c: c.dist_km)
     dbg["k_near_returned"] = len(cands_all)
 
+    # -------------------------
+    # Local entrance augmentation trigger (routing-aware-ish, but cheap)
+    # -------------------------
+    aug_dbg = {"enabled": bool(enable_local_entrance_aug), "triggered": False, "reason": None}
+    if enable_local_entrance_aug and len(cands_all) > 0:
+        # Seed candidates: nearest(s)
+        seeds = cands_all[: max(1, int(aug_seed_count))]
+        seed0 = seeds[0]
+
+        trigger = False
+        reasons: List[str] = []
+
+        # A) too few candidates (sparse net)
+        if len(cands_all) <= 2:
+            trigger = True
+            reasons.append("few_candidates")
+
+        # B) nearest sea node is "far"
+        if seed0.dist_km > float(aug_dist_trigger_km):
+            trigger = True
+            reasons.append(f"dist>{aug_dist_trigger_km:g}km")
+
+        # C) routing-aware: compare to target
+        if target_ll is not None and isinstance(target_ll, (list, tuple)) and len(target_ll) >= 2:
+            tgt = (float(target_ll[0]), float(target_ll[1]))
+            # compare d_end to best among top-K nodes (relative, avoids long-haul false triggers)
+            topK = cands_all[: min(len(cands_all), max(5, int(k_near)))]
+            d_end_list = [float(haversine_km(c.node_ll, tgt)) for c in topK]
+            d_end_min = float(min(d_end_list)) if d_end_list else float(haversine_km(seed0.node_ll, tgt))
+            d_end_seed0 = float(haversine_km(seed0.node_ll, tgt))
+
+            # angle: p_used->seed0 vs p_used->target
+            try:
+                b1 = bearing_deg(p_used_ll, seed0.node_ll)
+                b2 = bearing_deg(p_used_ll, tgt)
+                a_diff = ang_diff_deg(b1, b2)
+            except Exception:
+                a_diff = 0.0
+
+            aug_dbg.update(
+                {
+                    "target_ll": tgt,
+                    "d_end_seed0_km": d_end_seed0,
+                    "d_end_min_topK_km": d_end_min,
+                    "d_end_gap_km": float(d_end_seed0 - d_end_min),
+                    "angle_diff_deg": float(a_diff),
+                }
+            )
+
+            if (d_end_seed0 - d_end_min) > float(aug_delta_end_km):
+                trigger = True
+                reasons.append(f"end_gap>{aug_delta_end_km:g}km")
+            if a_diff > float(aug_angle_trigger_deg):
+                trigger = True
+                reasons.append(f"angle>{aug_angle_trigger_deg:g}deg")
+
+        if trigger:
+            aug_dbg["triggered"] = True
+            aug_dbg["reason"] = ",".join(reasons) if reasons else "trigger"
+
+            # Build virtual candidates from seed node(s)
+            added_total = 0
+            for s in seeds:
+                v = _virtual_candidates_from_seed_node(
+                    out,
+                    seed_idx=int(s.node_idx),
+                    p_used_ll=p_used_ll,
+                    component=s.component,
+                    max_neighbors=int(aug_seed_neighbors_cap),
+                )
+                if v:
+                    cands_all.extend(v)
+                    added_total += len(v)
+
+            # Dedup by rounded lon/lat
+            seen = set()
+            uniq: List[SnapCandidate] = []
+            for c in sorted(cands_all, key=lambda cc: cc.dist_km):
+                key = (round(float(c.node_ll[0]), 6), round(float(c.node_ll[1]), 6), int(c.component) if c.component is not None else None)
+                if key in seen:
+                    continue
+                seen.add(key)
+                uniq.append(c)
+            cands_all = uniq
+            aug_dbg["virtual_added"] = int(added_total)
+            aug_dbg["cands_all_after"] = int(len(cands_all))
+
+    dbg["local_entrance_aug"] = aug_dbg
+
+    # -------------------------
+    # selection logic (radius + ok_set + fallbacks)
+    # -------------------------
     def filter_by_radius(cands: List[SnapCandidate], r: float) -> List[SnapCandidate]:
         rr = float(r)
         return [c for c in cands if c.dist_km <= rr]
+
+    # decide radius fallback
+    if r_fallback_km is None:
+        cfg = out.get("cfg", None)
+        try:
+            r_fallback_km = float(getattr(getattr(cfg, "sea"), "r_max_km"))
+        except Exception:
+            r_fallback_km = float(r_max_km)
 
     cands_r = filter_by_radius(cands_all, float(r_max_km))
     dbg["within_r_max_km"] = len(cands_r)
@@ -815,7 +723,169 @@ def _sea_first_candidates(
 
 
 # -------------------------
-# Pair: component-aware pick (unchanged)
+# Snap decision tree (Updated: do NOT lock into coastal->GateB)
+# -------------------------
+def snap_to_sea_candidates(
+    out: Dict[str, Any],
+    p_ll: LonLat,
+    *,
+    k_near: int = 30,
+    r_max_km: float = 150.0,
+    prefer_ok_set: bool = True,
+    allow_fallback_non_ok: bool = True,
+    allow_radius_fallback: bool = True,
+    r_fallback_km: Optional[float] = None,
+    do_nudge: bool = True,
+    # coastal nudge params
+    k_near_coast: int = 80,
+    r_max_km_coast: Optional[float] = None,
+    # routing-aware trigger target (for local entrance augmentation)
+    target_ll: Optional[LonLat] = None,
+    # local entrance augmentation knobs
+    enable_local_entrance_aug: bool = True,
+    aug_dist_trigger_km: float = 60.0,
+    aug_delta_end_km: float = 120.0,
+    aug_angle_trigger_deg: float = 110.0,
+    aug_seed_neighbors_cap: int = 12,
+    aug_seed_count: int = 1,
+) -> SnapResult:
+    """
+    Decision tree:
+    - If point NOT in collision: normal sea-first candidates at p_ll
+    - If point IS in collision and do_nudge:
+        1) nudge to nearest coastal node p_coast (legal point just outside land)
+        2) sea-first candidates are queried from p_coast (NOT GateB-locked)
+    """
+    p_ll0 = normalize_lonlat(p_ll)
+    dbg: Dict[str, Any] = {}
+
+    S_nodes = out.get("S_nodes", None)
+    sea_kdt = out.get("sea_kdt", None)
+    sea_ok_set = out.get("sea_ok_set", None)
+
+    if S_nodes is None or sea_kdt is None:
+        return SnapResult(
+            p_input_ll=p_ll0,
+            p_used_ll=p_ll0,
+            was_nudged=False,
+            in_collision_input=False,
+            candidates=[],
+            reason="missing_S_nodes_or_sea_kdt",
+            debug={"has_S_nodes": S_nodes is not None, "has_kdt": sea_kdt is not None},
+        )
+
+    # collision check
+    collision_prep = None
+    geom_m = _get_collision_geom_m(out)
+    if geom_m is not None:
+        collision_prep = prep(geom_m)
+
+    in_collision = _is_in_collision(out, p_ll0, collision_prep=collision_prep) if geom_m is not None else False
+
+    # CASE 1) Not in collision -> sea-first
+    if (not in_collision) or (not do_nudge) or (geom_m is None):
+        dbg["mode"] = "sea_first"
+        return _sea_first_candidates(
+            out,
+            p_input_ll=p_ll0,
+            p_used_ll=p_ll0,
+            was_nudged=False,
+            in_collision_input=in_collision,
+            S_nodes=S_nodes,
+            sea_kdt=sea_kdt,
+            sea_ok_set=sea_ok_set,
+            k_near=k_near,
+            r_max_km=r_max_km,
+            prefer_ok_set=prefer_ok_set,
+            allow_fallback_non_ok=allow_fallback_non_ok,
+            allow_radius_fallback=allow_radius_fallback,
+            r_fallback_km=r_fallback_km,
+            target_ll=target_ll,
+            enable_local_entrance_aug=enable_local_entrance_aug,
+            aug_dist_trigger_km=aug_dist_trigger_km,
+            aug_delta_end_km=aug_delta_end_km,
+            aug_angle_trigger_deg=aug_angle_trigger_deg,
+            aug_seed_neighbors_cap=aug_seed_neighbors_cap,
+            aug_seed_count=aug_seed_count,
+            extra_debug=dbg,
+        )
+
+    # CASE 2) In collision -> coast then sea-first
+    dbg["mode"] = "coast_then_sea"
+
+    p_coast, ok_coast, dbg_coast = nudge_to_nearest_coastal_node(
+        out,
+        p_ll0,
+        k_near=int(k_near_coast),
+        r_max_km=float(r_max_km if r_max_km_coast is None else r_max_km_coast),
+        collision_prep=collision_prep,
+    )
+
+    dbg["chosen_coastal"] = {
+        "ok": bool(ok_coast),
+        "p_coast_ll": (float(p_coast[0]), float(p_coast[1])),
+        **(dbg_coast if isinstance(dbg_coast, dict) else {"dbg": str(dbg_coast)}),
+    }
+
+    if not ok_coast:
+        # fallback: boundary nudge then sea-first
+        dbg["fallback_reason"] = "coastal_nudge_failed"
+        p_b, ok_b, dbg_b = nudge_out_of_collision(out, p_ll0, collision_prep=collision_prep)
+        dbg["boundary_fallback"] = {"ok": bool(ok_b), **(dbg_b if isinstance(dbg_b, dict) else {"dbg": str(dbg_b)})}
+
+        return _sea_first_candidates(
+            out,
+            p_input_ll=p_ll0,
+            p_used_ll=p_b,
+            was_nudged=bool(ok_b),
+            in_collision_input=True,
+            S_nodes=S_nodes,
+            sea_kdt=sea_kdt,
+            sea_ok_set=sea_ok_set,
+            k_near=k_near,
+            r_max_km=r_max_km,
+            prefer_ok_set=prefer_ok_set,
+            allow_fallback_non_ok=allow_fallback_non_ok,
+            allow_radius_fallback=allow_radius_fallback,
+            r_fallback_km=r_fallback_km,
+            target_ll=target_ll,
+            enable_local_entrance_aug=enable_local_entrance_aug,
+            aug_dist_trigger_km=aug_dist_trigger_km,
+            aug_delta_end_km=aug_delta_end_km,
+            aug_angle_trigger_deg=aug_angle_trigger_deg,
+            aug_seed_neighbors_cap=aug_seed_neighbors_cap,
+            aug_seed_count=aug_seed_count,
+            extra_debug=dbg,
+        )
+
+    return _sea_first_candidates(
+        out,
+        p_input_ll=p_ll0,
+        p_used_ll=p_coast,
+        was_nudged=True,
+        in_collision_input=True,
+        S_nodes=S_nodes,
+        sea_kdt=sea_kdt,
+        sea_ok_set=sea_ok_set,
+        k_near=k_near,
+        r_max_km=r_max_km,
+        prefer_ok_set=prefer_ok_set,
+        allow_fallback_non_ok=allow_fallback_non_ok,
+        allow_radius_fallback=allow_radius_fallback,
+        r_fallback_km=r_fallback_km,
+        target_ll=target_ll,
+        enable_local_entrance_aug=enable_local_entrance_aug,
+        aug_dist_trigger_km=aug_dist_trigger_km,
+        aug_delta_end_km=aug_delta_end_km,
+        aug_angle_trigger_deg=aug_angle_trigger_deg,
+        aug_seed_neighbors_cap=aug_seed_neighbors_cap,
+        aug_seed_count=aug_seed_count,
+        extra_debug=dbg,
+    )
+
+
+# -------------------------
+# Pair: component-aware pick (passes target_ll to enable routing-aware triggers)
 # -------------------------
 def snap_pair_component_aware(
     out: Dict[str, Any],
@@ -831,15 +901,18 @@ def snap_pair_component_aware(
     do_nudge: bool = True,
     k_near_coast: int = 80,
     r_max_km_coast: Optional[float] = None,
-    # GateB params forwarded into snap_to_sea_candidates
-    k_near_gateb: int = 30,
-    r_max_km_gateb: float = 200.0,
+    # local entrance augmentation knobs
+    enable_local_entrance_aug: bool = True,
+    aug_dist_trigger_km: float = 60.0,
+    aug_delta_end_km: float = 120.0,
+    aug_angle_trigger_deg: float = 110.0,
+    aug_seed_neighbors_cap: int = 12,
+    aug_seed_count: int = 1,
 ) -> SnapPairResult:
     """
-    NOTE: now candidates may be either:
-      - Sea nodes (normal sea-first), or
-      - GateB nodes (collision mode, coast->gateB->sea)
-    Component-aware logic still works because GateB candidates carry component from rank0 sea_idx.
+    Component-aware pair snapping.
+    We pass the opposite endpoint as target_ll so snapping can detect "bad nearest entrance"
+    and augment virtual candidates around adjacent sea edges.
     """
     sres = snap_to_sea_candidates(
         out,
@@ -852,8 +925,13 @@ def snap_pair_component_aware(
         do_nudge=do_nudge,
         k_near_coast=k_near_coast,
         r_max_km_coast=r_max_km_coast,
-        k_near_gateb=k_near_gateb,
-        r_max_km_gateb=r_max_km_gateb,
+        target_ll=end_ll,
+        enable_local_entrance_aug=enable_local_entrance_aug,
+        aug_dist_trigger_km=aug_dist_trigger_km,
+        aug_delta_end_km=aug_delta_end_km,
+        aug_angle_trigger_deg=aug_angle_trigger_deg,
+        aug_seed_neighbors_cap=aug_seed_neighbors_cap,
+        aug_seed_count=aug_seed_count,
     )
     eres = snap_to_sea_candidates(
         out,
@@ -866,8 +944,13 @@ def snap_pair_component_aware(
         do_nudge=do_nudge,
         k_near_coast=k_near_coast,
         r_max_km_coast=r_max_km_coast,
-        k_near_gateb=k_near_gateb,
-        r_max_km_gateb=r_max_km_gateb,
+        target_ll=start_ll,
+        enable_local_entrance_aug=enable_local_entrance_aug,
+        aug_dist_trigger_km=aug_dist_trigger_km,
+        aug_delta_end_km=aug_delta_end_km,
+        aug_angle_trigger_deg=aug_angle_trigger_deg,
+        aug_seed_neighbors_cap=aug_seed_neighbors_cap,
+        aug_seed_count=aug_seed_count,
     )
 
     dbg: Dict[str, Any] = {
@@ -973,7 +1056,8 @@ def inject_point_edges(
 ):
     """
     Inject p_ll into graph by adding edges to top-k candidates.
-    weight = dist_km (km)
+    Also, if a candidate is a virtual point sampled on a sea edge, connect it back to the sea graph:
+      virtual <-> u_ll, virtual <-> v_ll
     """
     p_ll = normalize_lonlat(p_ll)
     if not hasattr(G, "add_edge"):
@@ -981,35 +1065,26 @@ def inject_point_edges(
 
     use = list(candidates)[: max(1, int(k_inject))]
     for c in use:
-        u = p_ll
         v = (float(c.node_ll[0]), float(c.node_ll[1]))
-        w = float(c.dist_km)
-        G.add_edge(u, v, **{weight_attr: w, "etype": etype, "inject": True})
+
+        # If virtual: connect it back to sea graph so A* can traverse it
+        bridge = getattr(c, "_virtual_bridge", None)
+        if isinstance(bridge, dict) and "u_ll" in bridge and "v_ll" in bridge:
+            u_ll = (float(bridge["u_ll"][0]), float(bridge["u_ll"][1]))
+            w_ll = (float(bridge["v_ll"][0]), float(bridge["v_ll"][1]))
+
+            # connect virtual -> endpoints (weights in km)
+            w1 = float(haversine_km(v, u_ll))
+            w2 = float(haversine_km(v, w_ll))
+            G.add_edge(v, u_ll, **{weight_attr: w1, "etype": "sea_virtual"})
+            G.add_edge(v, w_ll, **{weight_attr: w2, "etype": "sea_virtual"})
+
+        # Finally inject from point to candidate
+        w = float(haversine_km(p_ll, v))
+        G.add_edge(p_ll, v, **{weight_attr: w, "etype": etype, "inject": True})
+
     return len(use)
 
-
-def inject_coastal_to_gateb(
-    G,
-    coastal_ll: LonLat,
-    gateb_rows: List[Dict[str, Any]],
-    *,
-    k_inject: int = 4,
-    weight_attr: str = "weight",
-    etype: str = "inject_coast_gateb",
-):
-    """
-    Optional helper if you want to explicitly inject coastal->GateB edges.
-    (Often unnecessary if you already have c_gateb connectors in your base graph.)
-    """
-    coastal_ll = normalize_lonlat(coastal_ll)
-    use = gateb_rows[: max(1, int(k_inject))]
-    added = 0
-    for r in use:
-        gate_ll = (float(r["gate_ll"][0]), float(r["gate_ll"][1]))
-        w = float(r["dist_km"])
-        G.add_edge(coastal_ll, gate_ll, **{weight_attr: w, "etype": etype, "inject": True})
-        added += 1
-    return added
 
 
 __all__ = [
@@ -1018,9 +1093,7 @@ __all__ = [
     "SnapPairResult",
     "nudge_out_of_collision",
     "nudge_to_nearest_coastal_node",
-    "gateb_candidates_from_coastal",
     "snap_to_sea_candidates",
     "snap_pair_component_aware",
     "inject_point_edges",
-    "inject_coastal_to_gateb",
 ]

@@ -23,6 +23,8 @@ from .gates_b import build_gateB_connectors
 from . import scgraph_bridge
 
 from .gates_coverage import attach_gates_to_nearest_C, coverage_sample_gates_on_rings
+from .rings import build_coast_rings_smooth_v2, build_envelope_and_taut_rings_v1
+
 
 
 def _pad_bbox_ll(bbox_ll, pad_deg: float):
@@ -132,11 +134,67 @@ def build_aoi(cfg: RoutingMapConfig) -> Dict[str, Any]:
     )
 
     # --- Rings ---
-    ring_base_m, rings_m, rings_df = build_coast_rings_smooth_v2(
-        union_smooth_m,
-        avoid_km=cfg.land.avoid_km,
-        island_area_min_km2=cfg.cchain.island_area_min_km2,
-    )
+    ring_cfg = getattr(cfg, "rings", None)
+
+    rings_env_m = None
+    rings_taut_m = None
+    rings_obj = None
+
+    if ring_cfg is not None:
+        # v1: uses clearance_m (meters) from cfg.rings
+        collision_hard_m = layers["COLLISION_M"]  # 注意：這是「硬碰撞」的 metric 幾何
+
+        ring_base_m, env_lines_m, taut_lines_m, rings_df, rings = build_envelope_and_taut_rings_v1(
+            union_smooth_m,
+            collision_hard_m=collision_hard_m,
+            cfg=ring_cfg,
+        )
+
+        # 你現有下游（C-chain / gates coverage）吃 rings_m，所以先讓它用 taut
+        rings_m = taut_lines_m
+
+        # 額外保存（之後 debug / 分層繪圖用）
+        rings_env_m = env_lines_m
+        rings_taut_m = taut_lines_m
+        rings_obj = rings
+
+    else:
+        # legacy fallback (uses avoid_km from cfg.land.avoid_km)
+        ring_base_m, rings_m, rings_df = build_coast_rings_smooth_v2(
+            union_smooth_m,
+            avoid_km=cfg.land.avoid_km,
+            island_area_min_km2=5.0,
+        )
+    
+    if "length_km" not in rings_df.columns:
+        if "length_km_taut" in rings_df.columns:
+            rings_df["length_km"] = rings_df["length_km_taut"].astype(float)
+        elif "length_km_env" in rings_df.columns:
+            rings_df["length_km"] = rings_df["length_km_env"].astype(float)
+        elif "length_km_envelope" in rings_df.columns:
+            rings_df["length_km"] = rings_df["length_km_envelope"].astype(float)
+        else:
+            # 最後手段：用幾何自己算（慢但可靠，且 ring 數量通常不大）
+            from routing_map.routing_graph import haversine_km  # 你專案裡已有
+            def _line_len_km(ls):
+                coords = list(ls.coords)
+                s = 0.0
+                for (x1, y1), (x2, y2) in zip(coords[:-1], coords[1:]):
+                    s += haversine_km(x1, y1, x2, y2)
+                return float(s)
+
+            # rings 通常是 dict/list，這裡假設 rings_df 有 ring_id，且 rings_obj 可取到每個 ring 的線
+            ring_len = {}
+            # 你 v1 產物 rings 物件我不確定結構，所以做 best-effort
+            # 若 rings 是 list[LineString] 且和 rings_df 對齊：
+            if isinstance(rings, (list, tuple)) and len(rings) == len(rings_df):
+                for rid, ls in zip(rings_df["ring_id"].tolist(), rings):
+                    if hasattr(ls, "coords"):
+                        ring_len[int(rid)] = _line_len_km(ls)
+            rings_df["length_km"] = rings_df["ring_id"].map(lambda rid: ring_len.get(int(rid), np.nan))
+            rings_df["length_km"] = rings_df["length_km"].fillna(0.0)
+
+
 
     # --- C chain ---
     C_nodes, C_edges = build_C_chain_from_rings(
@@ -256,6 +314,9 @@ def build_aoi(cfg: RoutingMapConfig) -> Dict[str, Any]:
         "ring_base_m": ring_base_m,
         "rings_m": rings_m,
         "rings_df": rings_df,
+        "rings_env_m": rings_env_m,
+        "rings_taut_m": rings_taut_m,
+        "rings_obj": rings_obj,
 
         "C_nodes": C_nodes,
         "C_edges": C_edges,

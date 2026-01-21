@@ -1,46 +1,3 @@
-from pathlib import Path
-import routing_map
-from routing_map import build_aoi, RoutingMapConfig
-from routing_map.config import AoiConfig, LandConfig
-import folium, webbrowser
-import numpy as np
-import pandas as pd
-import networkx as nx
-from collections import Counter
-
-from shapely.geometry import LineString, box
-from shapely.ops import transform as shp_transform
-
-# === modules ===
-from routing_map.path_simplifier import simplify_path_visibility
-from routing_map.routing_graph import build_base_graph, haversine_km
-from routing_map.c_gateb_connectors import (
-    build_cnode_gateb_connectors_nearest,
-    add_cnode_gateb_connectors_to_graph,
-)
-from routing_map.snap import snap_pair_component_aware, inject_point_edges
-from routing_map.repairer import PathRepairer, RepairConfig
-
-#  snap-link repair helper (you said it's already ready)
-from routing_map.snap_link_repair import repair_snap_link_ll_if_needed
-
-from routing_map.metrics import path_length_km_nm, format_distance
-
-cfg = RoutingMapConfig(
-    aoi=AoiConfig(
-        bbox_ll=(10, -50, 150, 50),
-    ),
-    land=LandConfig(
-        shp_path=Path(r"C:\Users\slab\Desktop\Slab Project\Stage1\data\Land\ne_10m_land.shp"),
-        buffer_km=20.0,
-        avoid_km= 1,
-        collision_safety_km=0.5,
-    ),
-)
-
-out = build_aoi(cfg)
-
-
 import folium, webbrowser
 from pathlib import Path
 import numpy as np
@@ -179,56 +136,42 @@ def route_polyline_dateline_safe(path_ll):
 
 # --- projection utilities (USE out["proj"] to match layers CRS) ---
 def _make_ll_m_projectors_from_out(out):
-    """
-    Return:
-      ll2m_xy(lon,lat)->(x,y)      # for repairer (positional lon,lat)
-      m2ll_xy(x,y)->(lon,lat)
-      ll2m_tuple((lon,lat))->(x,y) # for simplifier (tuple)
-      m2ll_tuple((x,y))->(lon,lat)
-    """
+    """從 out['proj'] 建立經緯度 <-> 公尺 (XY) 的轉換函數"""
     proj = out.get("proj", None)
     if proj is None:
-        raise ValueError("out['proj'] not found. build_aoi() should return 'proj'.")
+        raise ValueError("out['proj'] not found.")
 
     def _apply(fn, a, b):
         if hasattr(fn, "transform") and callable(getattr(fn, "transform")):
             return fn.transform(a, b)
         if callable(fn):
-            try:
-                return fn(a, b)
-            except TypeError:
-                return fn((a, b))
-        raise TypeError(f"Projector {type(fn)} not callable and no .transform")
+            return fn(a, b) if hasattr(fn, "__call__") else fn((a, b))
+        raise TypeError(f"Projector {type(fn)} invalid")
 
-    candidates = [
-        ("ll_to_xy", "xy_to_ll"),
-        ("ll_to_m", "m_to_ll"),
-        ("to_m", "to_ll"),
-        ("fwd", "inv"),
-        ("forward", "inverse"),
-    ]
-
+    candidates = [("ll_to_xy", "xy_to_ll"), ("ll_to_m", "m_to_ll"), ("to_m", "to_ll"), ("fwd", "inv")]
     for a, b in candidates:
         if hasattr(proj, a) and hasattr(proj, b):
-            f = getattr(proj, a)
-            g = getattr(proj, b)
+            # debug msg
+            print(f"\n[PROJECTOR] Using methods: {a} / {b}")
+            # debug msg
+            f, g = getattr(proj, a), getattr(proj, b)
+            # ------------------------------------------
+            print(f"[PROJECTOR] Type of f: {type(f)}")
+            print(f"[PROJECTOR] f = {f}")
+            try:
+                if hasattr(f, "transform"):
+                    test_result = f.transform(119.7734, 4.7502)
+                else:
+                    test_result = f(119.7734, 4.7502)
+                print(f"[PROJECTOR] Direct call result = {test_result}")
+            except Exception as e:
+                print(f"[PROJECTOR] Direct call failed: {e}")
+            # ------------------------------------------
+            ll2m_xy = lambda lon, lat: tuple(map(float, _apply(f, float(lon), float(lat))))
+            m2ll_xy = lambda x, y: tuple(map(float, _apply(g, float(x), float(y))))
+            return ll2m_xy, m2ll_xy, lambda p: ll2m_xy(p[0], p[1]), lambda q: m2ll_xy(q[0], q[1])
 
-            def ll2m_xy(lon, lat, _f=f):
-                x, y = _apply(_f, float(lon), float(lat))
-                return (float(x), float(y))
-
-            def m2ll_xy(x, y, _g=g):
-                lon, lat = _apply(_g, float(x), float(y))
-                return (float(lon), float(lat))
-
-            ll2m_tuple = lambda p: ll2m_xy(p[0], p[1])
-            m2ll_tuple = lambda q: m2ll_xy(q[0], q[1])
-            return ll2m_xy, m2ll_xy, ll2m_tuple, m2ll_tuple
-
-    if hasattr(proj, "transform") and callable(getattr(proj, "transform")):
-        raise ValueError("proj.transform exists but inverse isn't inferable; please provide proj with inverse method.")
-
-    raise ValueError("Cannot infer projection methods from out['proj'].")
+    raise ValueError("Cannot infer projection methods.")
 
 
 def _get_collision_metric(out):
@@ -348,6 +291,7 @@ def _clip_collision_to_aoi_bbox(collision_m, bbox_ll, ll2m_xy, pad_m=80_000.0):
         if c2 is None or c2.is_empty:
             print("[collision] clip empty -> keep original")
             return collision_m
+        
         return c2
     except Exception as e:
         print("[collision] clip failed -> keep original:", repr(e))
@@ -480,6 +424,8 @@ def open_routing_debug_map_p2p(
     path = None
     path_ll_for_simplify = None
     path_simplified, simp_stats = None, None
+    collision_used = None
+    ll2m_xy, m2ll_xy = None, None
 
     #  store inject-edge polylines (these are the "temporary point" links you care about)
     inject_start_ll = None   # path[0] -> path[1] (repaired if start_inject)
@@ -493,6 +439,7 @@ def open_routing_debug_map_p2p(
         print("[snap] OK:", pair.reason, pair.debug)
         print("[snap][start] local_entrance_aug:", pair.start.debug.get("local_entrance_aug"))
         print("[snap][end  ] local_entrance_aug:", pair.end.debug.get("local_entrance_aug"))
+
 
         # --- A* ---
         try:
@@ -514,23 +461,33 @@ def open_routing_debug_map_p2p(
             print("[repair/simplify] skip: no valid path")
         else:
             ll2m_xy, m2ll_xy, ll2m_tuple, m2ll_tuple = _make_ll_m_projectors_from_out(out)
-
-            def _ll_to_m_any(a, b=None):
-                if b is None:
-                    return ll2m_xy(float(a[0]), float(a[1]))
-                return ll2m_xy(float(a), float(b))
-
-            def _m_to_ll_any(a, b=None):
-                if b is None:
-                    return m2ll_xy(float(a[0]), float(a[1]))
-                return m2ll_xy(float(a), float(b))
-
             collision = _get_collision_metric(out)
+            b = collision.bounds
+            print("[crs] collision.bounds =", b)
+            print("[crs] collision looks like",
+                "DEGREES(lon/lat)" if max(map(abs, b)) < 1000 else "METERS")
+            # ----- debug
+            p = (119.7734, 4.7502)
+            x, y = ll2m_xy(p[0], p[1])
+            print("[crs] ll2m(p) =", (x, y))
+            b = collision.bounds
+            print("[crs] point-in-collision-bounds?", (b[0] <= x <= b[2] and b[1] <= y <= b[3]))
+            print("[crs] collision.bounds =", b)
+            
+
+            # ----- debug 
+
+            _ll_to_m = lambda a, b=None: ll2m_xy(float(a[0]), float(a[1])) if b is None else ll2m_xy(float(a), float(b))
+            _m_to_ll = lambda a, b=None: m2ll_xy(float(a[0]), float(a[1])) if b is None else m2ll_xy(float(a), float(b))
+
+            
             if collision is None:
                 print("[collision] not found -> skip repair/simplify")
                 path_ll_for_simplify = [(float(p[0]), float(p[1])) for p in path]
             else:
-                collision = _clip_collision_to_aoi_bbox(collision, bbox_ll, ll2m_xy, pad_m=80000.0)
+                collision = _clip_collision_to_aoi_bbox(collision, bbox_ll, ll2m_xy)
+                #print("[collision_full.bounds]", collision_full.bounds)
+                #print("[collision_repair.bounds]", collision_repair.bounds)
                 print("[collision] bounds:", getattr(collision, "bounds", None), "type:", getattr(collision, "geom_type", type(collision)))
                 collision_used = collision
 
@@ -563,8 +520,8 @@ def open_routing_debug_map_p2p(
                             (float(u0[0]), float(u0[1])),
                             (float(u1[0]), float(u1[1])),
                             collision_m=collision,
-                            ll_to_m=_ll_to_m_any,
-                            m_to_ll=_m_to_ll_any,
+                            ll_to_m=_ll_to_m,
+                            m_to_ll=_m_to_ll,
                             repairer_obj=repairer_obj,
                         )
                     else:
@@ -576,8 +533,8 @@ def open_routing_debug_map_p2p(
                             (float(v1[0]), float(v1[1])),
                             (float(v0[0]), float(v0[1])),
                             collision_m=collision,
-                            ll_to_m=_ll_to_m_any,
-                            m_to_ll=_m_to_ll_any,
+                            ll_to_m=_ll_to_m,
+                            m_to_ll=_m_to_ll,
                             repairer_obj=repairer_obj,
                         )
                     else:
@@ -596,8 +553,8 @@ def open_routing_debug_map_p2p(
                             G,
                             core_nodes,
                             collision_m=collision,
-                            ll_to_m=_ll_to_m_any,
-                            m_to_ll=_m_to_ll_any,
+                            ll_to_m=_ll_to_m,
+                            m_to_ll=_m_to_ll,
                         )
                         print("[core-repair]", core_rep.stats)
                         core_repaired_ll = [(float(p[0]), float(p[1])) for p in core_rep.path_ll]
@@ -629,18 +586,30 @@ def open_routing_debug_map_p2p(
 
                 # simplify
                 # simplify
+                print(len(path_ll_for_simplify))
+                #for i, (lon, lat) in enumerate(path_ll_for_simplify):
+                    #print(f"[dump] {i:03d}: ({float(lon):.10f}, {float(lat):.10f})")
                 if do_simplify and path_ll_for_simplify is not None and len(path_ll_for_simplify) >= 2:
                     path_simplified, simp_stats = simplify_path_visibility(
                         path_ll_for_simplify,
                         collision_m=collision,
-                        ll_to_m=_ll_to_m_any,
-                        m_to_ll=_m_to_ll_any,
+                        ll_to_m=_ll_to_m,
+                        m_to_ll=_m_to_ll,
                         window_size=80,
                         max_tries=300,
                         use_prepared_collision=True,
                         dateline_unwrap=True,
                     )
                     print("[simplify]", simp_stats)
+                    #for i, (lon, lat) in enumerate(path_simplified):
+                       # print(f"[dump] {i:03d}: ({float(lon):.10f}, {float(lat):.10f})")
+                    p = (119.7734, 4.7502)
+                    print("[crs] _ll_to_m(p)     =", _ll_to_m(p))
+                    # 如果你程式裡還存在 _ll_to_m_any，也一起印
+                    try:
+                        print("[crs] _ll_to_m_any(p) =", _ll_to_m_any(p))
+                    except NameError:
+                        pass
 
                     # ---------------------------
                     # 1) Decide CORE final polyline (priority: simplified > repaired_full > original A*)
@@ -664,8 +633,8 @@ def open_routing_debug_map_p2p(
                             snap_start_ll = repair_snap_link_ll_if_needed(
                                 origin_ll, start_key,
                                 collision_m=collision,
-                                ll_to_m=_ll_to_m_any,
-                                m_to_ll=_m_to_ll_any,
+                                ll_to_m=_ll_to_m,
+                                m_to_ll=_m_to_ll,
                                 repairer_obj=repairer_obj,   # 你前面已經建過 PathRepairer 了，直接重用
                             )
                         else:
@@ -676,8 +645,8 @@ def open_routing_debug_map_p2p(
                             snap_end_ll = repair_snap_link_ll_if_needed(
                                 end_key, dest_ll,
                                 collision_m=collision,
-                                ll_to_m=_ll_to_m_any,
-                                m_to_ll=_m_to_ll_any,
+                                ll_to_m=_ll_to_m,
+                                m_to_ll=_m_to_ll,
                                 repairer_obj=repairer_obj,
                             )
                         else:
@@ -731,21 +700,21 @@ def open_routing_debug_map_p2p(
     folium.Rectangle(bounds=[[min_lat, min_lon], [max_lat, max_lon]], fill=False, weight=3, opacity=0.9).add_to(m)
     m.fit_bounds([[min_lat, min_lon], [max_lat, max_lon]])
 
-    # draw collision used (optional)
+    # draw collision used (optional)    
     try:
         collision_viz = collision_used
         if collision_viz is not None:
-            print("[collision viz ] bounds:", collision_viz.bounds, "type:", collision_viz.geom_type)
-            ll2m_xy, m2ll_xy, _, _ = _make_ll_m_projectors_from_out(out)
-            collision_viz = _clip_collision_to_aoi_bbox(collision_viz, bbox_ll, ll2m_xy, pad_m=50_000.0)
+            print("[collision viz EXACT] bounds:", getattr(collision_viz, "bounds", None),
+                  "type:", getattr(collision_viz, "geom_type", type(collision_viz)))
+
+            # Use the same projector as the algorithm
+            _, m2ll_xy, _, _ = _make_ll_m_projectors_from_out(out)
+
+            # IMPORTANT: no extra clipping here, no viz_box intersection.
+            # This ensures what you see == what simplify used.
             col_ll = _geom_m_to_ll(collision_viz, m2ll_xy)
-            from shapely.geometry import box as shp_box
-            min_lon, min_lat, max_lon, max_lat = map(float, bbox_ll)
-            # 建立一個完美的經緯度矩形
-            viz_box = shp_box(min_lon, min_lat, max_lon, max_lat)
-            # 只保留在這個矩形內的圖形
-            col_ll = col_ll.intersection(viz_box)
-            fgCol = folium.FeatureGroup(name="Collision (USED, approx ll)", show=False)
+
+            fgCol = folium.FeatureGroup(name="Collision (USED, exact ll)", show=False)
             folium.GeoJson(
                 data=col_ll.__geo_interface__,
                 style_function=lambda _: {"fillColor": "#3b82f6", "color": "#3b82f6", "weight": 2, "fillOpacity": 0.15},

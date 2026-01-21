@@ -5,6 +5,8 @@ from typing import Optional, Tuple
 from .types import LonLat, BBoxLL
 from dataclasses import dataclass, field
 from typing import List
+from routing_map.ring_types import RingBuildConfig  
+
 
 @dataclass
 class LandConfig:
@@ -87,5 +89,6 @@ class RoutingMapConfig:
     gate_f: GateFConfig = GateFConfig()
     sea: SeaConfig = SeaConfig()
     coverage: CoverageConfig = CoverageConfig()
+    rings: Optional[RingBuildConfig] = None
 
 
