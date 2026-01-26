@@ -16,6 +16,18 @@ class AOIProjector:
     crs_m: CRS
     to_m: Transformer
     to_ll: Transformer
+    # --- add: stable helpers ---
+    def ll2m(self, lon: float, lat: float) -> Tuple[float, float]:
+        x, y = self.to_m.transform(float(lon), float(lat))
+        return float(x), float(y)
+
+    def m2ll(self, x: float, y: float) -> Tuple[float, float]:
+        lon, lat = self.to_ll.transform(float(x), float(y))
+        return float(lon), float(lat)
+
+    # optional: dict-like access (handy if other modules do proj["m2ll"])
+    def __getitem__(self, k: str):
+        return getattr(self, k)
 
 def make_aoi_bbox(origin_ll: LonLat, dest_ll: LonLat, pad_deg: float) -> BBoxLL:
     (lon1, lat1) = origin_ll
@@ -28,7 +40,13 @@ def make_aoi_bbox(origin_ll: LonLat, dest_ll: LonLat, pad_deg: float) -> BBoxLL:
 
 def build_projector_from_bbox(bbox_ll: BBoxLL) -> AOIProjector:
     (min_lon, min_lat, max_lon, max_lat) = bbox_ll
-    lon0 = (min_lon + max_lon) / 2.0
+    if min_lon <= max_lon:
+        lon0 = (min_lon + max_lon) / 2.0
+    else:
+        # crosses dateline: shift max_lon into [min_lon, min_lon+360]
+        lon0 = (min_lon + (max_lon + 360.0)) / 2.0
+        if lon0 > 180.0:
+            lon0 -= 360.0
     lat0 = (min_lat + max_lat) / 2.0
     crs_ll = CRS.from_epsg(4326)
     crs_m = CRS.from_proj4(
@@ -112,3 +130,4 @@ def expand_bbox_ll(bbox_ll: Tuple[float, float, float, float], pad_deg: float) -
     max_lon2 = min( 180.0, max_lon2)
 
     return (min_lon2, min_lat2, max_lon2, max_lat2)
+

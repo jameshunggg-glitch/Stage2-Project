@@ -24,12 +24,36 @@ from . import scgraph_bridge
 
 from .gates_coverage import attach_gates_to_nearest_C, coverage_sample_gates_on_rings
 from .rings import build_coast_rings_smooth_v2, build_envelope_and_taut_rings_v1
-
+from .ring_graph import build_ring_nodes_edges, RingGraphBuildParams
+from .geom_utils import expand_bbox_ll
+from routing_map.e_t_transfer_v2 import build_e_t_transfer_edges, ETRampConfig
 
 
 def _pad_bbox_ll(bbox_ll, pad_deg: float):
-    x0, y0, x1, y1 = [float(v) for v in bbox_ll]
-    return (x0 - pad_deg, y0 - pad_deg, x1 + pad_deg, y1 + pad_deg)
+    return expand_bbox_ll(bbox_ll, pad_deg)
+
+
+def _norm_bbox_ll(bbox_ll):
+    x0, y0, x1, y1 = map(float, bbox_ll)
+
+    # normalize latitude ordering
+    if y0 > y1:
+        y0, y1 = y1, y0
+
+    # longitude: keep x0>x1 as "dateline crossing" when span is huge
+    # but fix obvious reversed input (small span but swapped)
+    if x0 > x1:
+        span_if_swapped = x0 - x1
+        if span_if_swapped < 180.0:
+            # likely just reversed input -> swap
+            x0, x1 = x1, x0
+        else:
+            # treat as dateline crossing -> keep
+            pass
+
+    return (x0, y0, x1, y1)
+
+
 
 def _bbox_crosses_dateline(bbox_ll):
     x0, y0, x1, y1 = map(float, bbox_ll)
@@ -98,8 +122,16 @@ def _filter_df_in_bbox(df, bbox_ll, lon_col="lon", lat_col="lat"):
     if df is None or len(df) == 0:
         return df
     x0, y0, x1, y1 = [float(v) for v in bbox_ll]
-    m = (df[lon_col].between(x0, x1)) & (df[lat_col].between(y0, y1))
-    return df.loc[m].reset_index(drop=True)
+
+    if x0 <= x1:
+        m_lon = df[lon_col].between(x0, x1)
+    else:
+        # dateline crossing: [x0,180] U [-180,x1]
+        m_lon = (df[lon_col] >= x0) | (df[lon_col] <= x1)
+
+    m_lat = df[lat_col].between(y0, y1)
+    return df.loc[m_lon & m_lat].reset_index(drop=True)
+
 
 
 def build_aoi(cfg: RoutingMapConfig) -> Dict[str, Any]:
@@ -112,6 +144,9 @@ def build_aoi(cfg: RoutingMapConfig) -> Dict[str, Any]:
         if cfg.aoi.origin_ll is None or cfg.aoi.dest_ll is None:
             raise ValueError("Provide either aoi.bbox_ll or (aoi.origin_ll & aoi.dest_ll)")
         bbox_ll = make_aoi_bbox(cfg.aoi.origin_ll, cfg.aoi.dest_ll, cfg.aoi.pad_deg)
+    
+    bbox_ll = _norm_bbox_ll(bbox_ll)
+
 
     proj = build_projector_from_bbox(bbox_ll)
 
@@ -157,6 +192,18 @@ def build_aoi(cfg: RoutingMapConfig) -> Dict[str, Any]:
         rings_env_m = env_lines_m
         rings_taut_m = taut_lines_m
         rings_obj = rings
+        ring_graph = None
+        if rings_obj is not None:
+            ring_graph = build_ring_nodes_edges(
+                rings_obj,
+                proj=proj,
+                cfg=ring_cfg,
+                params=RingGraphBuildParams(
+                    e_angle_feature_deg=25.0,  # E feature 門檻（先保守）
+                    t_max_gap_km=20.0,         # T densify 最大邊長
+                    shared_tol_m=25.0,         # E∩T 合併距離
+                ),
+            )
 
     else:
         # legacy fallback (uses avoid_km from cfg.land.avoid_km)
@@ -193,6 +240,25 @@ def build_aoi(cfg: RoutingMapConfig) -> Dict[str, Any]:
                         ring_len[int(rid)] = _line_len_km(ls)
             rings_df["length_km"] = rings_df["ring_id"].map(lambda rid: ring_len.get(int(rid), np.nan))
             rings_df["length_km"] = rings_df["length_km"].fillna(0.0)
+    
+    et_cfg = ETRampConfig(
+        ramp_spacing_km=60.0,
+        min_ramp_per_ring=2,
+        near_shared_km=15.0,
+        topK_T=12,
+        k_ramp_per_anchor=1,
+        ramp_max_km=40.0,
+        ramp_penalty=0.10,
+        enable_collision_check=True,
+    )
+    et_out = build_e_t_transfer_edges(
+        ring_graph,
+        collision_hard_m=layers["COLLISION_M"],  # 你 metric 的硬碰撞（或你想用 hard+clearance buffer）
+        cfg=et_cfg,
+        shared_edge_cost=0.0,
+    )
+    ring_graph.update(et_out)
+
 
 
 
@@ -317,6 +383,7 @@ def build_aoi(cfg: RoutingMapConfig) -> Dict[str, Any]:
         "rings_env_m": rings_env_m,
         "rings_taut_m": rings_taut_m,
         "rings_obj": rings_obj,
+        "ring_graph": ring_graph,
 
         "C_nodes": C_nodes,
         "C_edges": C_edges,

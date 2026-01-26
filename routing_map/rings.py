@@ -126,30 +126,20 @@ def build_envelope_and_taut_rings_v1(
     if cfg is None:
         cfg = RingBuildConfig()
 
-    # For taut checks, use buffered collision (safer)
+        # collision used by taut checks (configurable)
     collision_taut_m = None
     if collision_hard_m is not None and (not getattr(collision_hard_m, "is_empty", True)):
-        # collision_taut_m = collision_hard_m.buffer(float(cfg.clearance_m)).buffer(0)
-        def build_envelope_and_taut_rings_v1(
-            land_union_m,
-            *,
-            collision_hard_m,
-            cfg: Optional[RingBuildConfig] = None,
-        ):
-            if cfg is None:
-                cfg = RingBuildConfig()
+        if getattr(cfg, "taut_use_clearance_buffer", True):
+            buf_m = cfg.taut_collision_buffer_m
+            print(buf_m)
+            if buf_m is None:
+                buf_m = cfg.clearance_m
+                print(buf_m)
+            collision_taut_m = collision_hard_m.buffer(float(buf_m)).buffer(0)
+        else:
+            # use original collision as-is
+            collision_taut_m = collision_hard_m
 
-            # collision used by taut checks (configurable)
-            collision_taut_m = None
-            if collision_hard_m is not None and (not getattr(collision_hard_m, "is_empty", True)):
-                if getattr(cfg, "taut_use_clearance_buffer", True):
-                    buf_m = cfg.taut_collision_buffer_m
-                    if buf_m is None:
-                        buf_m = cfg.clearance_m
-                    collision_taut_m = collision_hard_m.buffer(float(buf_m)).buffer(0)
-                else:
-                    # use original collision as-is
-                    collision_taut_m = collision_hard_m
 
 
     ring_base_m, rings = build_envelope_rings_m(
@@ -167,7 +157,7 @@ def build_envelope_and_taut_rings_v1(
         envelope_lines.append(LineString(env_pts))
 
         taut_pts, taut_stats = taut_simplify_closed_ring(
-            env_pts, collision_taut_m=collision_taut_m, cfg=cfg
+            env_pts, collision_taut_m=collision_taut_m, collision_hard_m=collision_hard_m,cfg=cfg
         )
         r.taut_pts_m = taut_pts
         r.stats.update(

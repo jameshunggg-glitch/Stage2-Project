@@ -15,6 +15,18 @@ from routing_map.c_gateb_connectors import (
     build_cnode_gateb_connectors_nearest,
     add_cnode_gateb_connectors_to_graph,
 )
+
+from routing_map.e_t_transfer import (
+    build_et_shared_edges,
+    add_et_shared_edges_to_graph,
+    ETTransferParams,
+)
+from routing_map.t_gate_connectors import (
+    build_tgate_sea_connectors,
+    add_tgate_sea_connectors_to_graph,
+    TGateSeaConnectorParams,
+)
+
 from routing_map.snap import snap_pair_component_aware, inject_point_edges
 from routing_map.repairer import PathRepairer, RepairConfig
 
@@ -80,6 +92,105 @@ def get_gateB_df(out, gate_xy):
             dfGB = gb2.copy()
 
     return dfGB if (dfGB is not None and len(dfGB) > 0) else None
+
+
+# ---------------------------
+# ring / t-gate graph helpers
+# ---------------------------
+
+def guess_sea_node_key_fn(G: nx.Graph):
+    """Guess how sea nodes are keyed in the networkx graph."""
+    if G is None:
+        return lambda i: int(i)
+    # common patterns
+    if 0 in G:
+        return lambda i: int(i)
+    if ("S", 0) in G:
+        return lambda i: ("S", int(i))
+    if ("sea", 0) in G:
+        return lambda i: ("sea", int(i))
+    return lambda i: int(i)
+
+def add_ring_nodes_edges_to_graph(
+    G: nx.Graph,
+    out: dict,
+    *,
+    e_node_key_fn=lambda eid: ("E", int(eid)),
+    t_node_key_fn=lambda tid: ("T", int(tid)),
+    weight_attr="weight_km",
+):
+    """Add E/T ring nodes and their cycle edges into the graph."""
+    rg = out.get("ring_graph", {}) or {}
+    E_nodes = rg.get("E_nodes", None)
+    T_nodes = rg.get("T_nodes", None)
+    E_edges = rg.get("E_edges", None)
+    T_edges = rg.get("T_edges", None)
+
+    added_nodes = 0
+    added_edges = 0
+
+    # --- nodes ---
+    if isinstance(E_nodes, pd.DataFrame) and len(E_nodes) > 0:
+        for r in E_nodes.itertuples(index=False):
+            k = e_node_key_fn(int(getattr(r, "node_id")))
+            if k not in G:
+                G.add_node(k)
+                added_nodes += 1
+            # attach attrs for viz/debug
+            for col in ("lon", "lat", "x_m", "y_m", "ring_id", "seq", "s_km"):
+                if hasattr(r, col):
+                    G.nodes[k][col] = float(getattr(r, col)) if col in ("lon","lat","x_m","y_m","s_km") else int(getattr(r, col))
+
+    if isinstance(T_nodes, pd.DataFrame) and len(T_nodes) > 0:
+        for r in T_nodes.itertuples(index=False):
+            k = t_node_key_fn(int(getattr(r, "node_id")))
+            if k not in G:
+                G.add_node(k)
+                added_nodes += 1
+            for col in ("lon", "lat", "x_m", "y_m", "ring_id", "seq", "s_km"):
+                if hasattr(r, col):
+                    G.nodes[k][col] = float(getattr(r, col)) if col in ("lon","lat","x_m","y_m","s_km") else int(getattr(r, col))
+            if hasattr(r, "is_gate_candidate"):
+                G.nodes[k]["is_gate_candidate"] = bool(getattr(r, "is_gate_candidate"))
+
+    # --- fast lookup metric xy ---
+    e_xy = {}
+    if isinstance(E_nodes, pd.DataFrame) and len(E_nodes) > 0 and "x_m" in E_nodes.columns:
+        for r in E_nodes.itertuples(index=False):
+            e_xy[int(r.node_id)] = (float(r.x_m), float(r.y_m))
+
+    t_xy = {}
+    if isinstance(T_nodes, pd.DataFrame) and len(T_nodes) > 0 and "x_m" in T_nodes.columns:
+        for r in T_nodes.itertuples(index=False):
+            t_xy[int(r.node_id)] = (float(r.x_m), float(r.y_m))
+
+    def _dist_km(a, b):
+        ax, ay = a
+        bx, by = b
+        return float(((ax - bx) ** 2 + (ay - by) ** 2) ** 0.5) / 1000.0
+
+    # --- edges ---
+    if isinstance(E_edges, pd.DataFrame) and len(E_edges) > 0:
+        for r in E_edges.itertuples(index=False):
+            u = int(getattr(r, "u"))
+            v = int(getattr(r, "v"))
+            ku = e_node_key_fn(u)
+            kv = e_node_key_fn(v)
+            w = _dist_km(e_xy[u], e_xy[v]) if (u in e_xy and v in e_xy) else 0.0
+            G.add_edge(ku, kv, etype=str(getattr(r, "etype", "E_RING")), ring_id=int(getattr(r, "ring_id", -1)), seq=int(getattr(r, "seq", -1)), **{weight_attr: w, "weight": w})
+            added_edges += 1
+
+    if isinstance(T_edges, pd.DataFrame) and len(T_edges) > 0:
+        for r in T_edges.itertuples(index=False):
+            u = int(getattr(r, "u"))
+            v = int(getattr(r, "v"))
+            ku = t_node_key_fn(u)
+            kv = t_node_key_fn(v)
+            w = _dist_km(t_xy[u], t_xy[v]) if (u in t_xy and v in t_xy) else 0.0
+            G.add_edge(ku, kv, etype=str(getattr(r, "etype", "T_RING")), ring_id=int(getattr(r, "ring_id", -1)), seq=int(getattr(r, "seq", -1)), **{weight_attr: w, "weight": w})
+            added_edges += 1
+
+    return {"nodes_added": added_nodes, "edges_added": added_edges}
 
 def parse_node_id_str(s):
     try:
@@ -402,6 +513,46 @@ def open_routing_debug_map_p2p(
         )
         added = add_cnode_gateb_connectors_to_graph(G, cgb_df, etype="c_gb", weight_col="dist_deg")
         print(f"[graph] C↔GateB bridge edges added: {added}")
+
+
+# --- add ring graph (E/T) + E↔T transfer + T-gate→Sea connectors ---
+try:
+    rg = out.get("ring_graph", {}) or {}
+    if isinstance(rg.get("E_nodes"), pd.DataFrame) and isinstance(rg.get("T_nodes"), pd.DataFrame):
+        # namespace ring node ids to avoid collisions with sea indices
+        e_key_fn = lambda eid: ("E", int(eid))
+        t_key_fn = lambda tid: ("T", int(tid))
+
+        sea_key_fn = guess_sea_node_key_fn(G)
+
+        st = add_ring_nodes_edges_to_graph(G, out, e_node_key_fn=e_key_fn, t_node_key_fn=t_key_fn)
+        print(f"[graph] ring nodes/edges added: {st}")
+
+        # E↔T shared transfer edges (0-cost)
+        df_et = build_et_shared_edges(out, params=ETTransferParams(weight_km=0.0, bidirectional=True))
+        added_et = add_et_shared_edges_to_graph(G, df_et, e_node_key_fn=e_key_fn, t_node_key_fn=t_key_fn)
+        out["et_shared_edges"] = df_et
+        print(f"[graph] E↔T shared transfer edges added: {added_et}")
+
+        # T gate → Sea connectors
+        tparams = TGateSeaConnectorParams(
+            k_connect=2,
+            topN=60,
+            r_connect_km=120.0,
+            enable_sector_filter=True,
+            sector_deg=110.0,
+            do_collision_check=True,
+            do_repair=True,
+        )
+        df_tconn = build_tgate_sea_connectors(out, params=tparams)
+        added_tconn = add_tgate_sea_connectors_to_graph(G, df_tconn, t_node_key_fn=t_key_fn, sea_node_key_fn=sea_key_fn)
+        out["tgate_sea_connectors"] = df_tconn
+        print(f"[graph] T-gate→Sea connector edges added: {added_tconn}")
+    else:
+        print("[graph] ring_graph not found or empty; skip ring/tgate integration")
+except Exception as e:
+    print("[graph] ring/tgate integration failed:", repr(e))
+
 
     # --- snap pair ---
     pair = snap_pair_component_aware(
@@ -860,6 +1011,113 @@ def open_routing_debug_map_p2p(
             final_u = route_polyline_dateline_safe(final_ll)
             folium.PolyLine([[p[1], p[0]] for p in final_u], weight=6, opacity=0.95).add_to(fgF)
             fgF.add_to(m)
+
+
+
+# ---------------------------
+# Ring graph + T-gates + connectors (viz)
+# ---------------------------
+rg = out.get("ring_graph", {}) or {}
+E_nodes = rg.get("E_nodes", None)
+T_nodes = rg.get("T_nodes", None)
+E_edges_rg = rg.get("E_edges", None)
+T_edges_rg = rg.get("T_edges", None)
+Shared_nodes_rg = rg.get("Shared_nodes", None)
+
+df_et = safe_df(out, "et_shared_edges")
+df_tconn = safe_df(out, "tgate_sea_connectors")
+
+def _lonlat_dict(df):
+    d = {}
+    if isinstance(df, pd.DataFrame) and len(df) > 0:
+        for r in df.itertuples(index=False):
+            try:
+                d[int(getattr(r, "node_id"))] = (float(getattr(r, "lon")), float(getattr(r, "lat")))
+            except Exception:
+                pass
+    return d
+
+e_ll = _lonlat_dict(E_nodes)
+t_ll = _lonlat_dict(T_nodes)
+
+# E edges
+if isinstance(E_edges_rg, pd.DataFrame) and len(E_edges_rg) > 0:
+    fg = folium.FeatureGroup(name=f"E_edges ({len(E_edges_rg)})", show=False)
+    drawn = 0
+    for r in E_edges_rg.itertuples(index=False):
+        u, v = int(getattr(r, "u")), int(getattr(r, "v"))
+        if u in e_ll and v in e_ll:
+            a, b = e_ll[u], e_ll[v]
+            folium.PolyLine([[a[1], a[0]], [b[1], b[0]]], color="#ff6a00", weight=2, opacity=0.75).add_to(fg)
+            drawn += 1
+    fg.add_to(m)
+    print(f"[viz] E_edges drawn: {drawn}/{len(E_edges_rg)}")
+
+# T edges
+if isinstance(T_edges_rg, pd.DataFrame) and len(T_edges_rg) > 0:
+    fg = folium.FeatureGroup(name=f"T_edges ({len(T_edges_rg)})", show=True)
+    drawn = 0
+    for r in T_edges_rg.itertuples(index=False):
+        u, v = int(getattr(r, "u")), int(getattr(r, "v"))
+        if u in t_ll and v in t_ll:
+            a, b = t_ll[u], t_ll[v]
+            folium.PolyLine([[a[1], a[0]], [b[1], b[0]]], color="#111111", weight=3, opacity=0.85).add_to(fg)
+            drawn += 1
+    fg.add_to(m)
+    print(f"[viz] T_edges drawn: {drawn}/{len(T_edges_rg)}")
+
+# T gate candidates (nodes)
+if isinstance(T_nodes, pd.DataFrame) and len(T_nodes) > 0 and "is_gate_candidate" in T_nodes.columns:
+    fg = folium.FeatureGroup(name=f"T_gates ({int(T_nodes['is_gate_candidate'].sum())})", show=True)
+    dfG = T_nodes[T_nodes["is_gate_candidate"] == True]
+    for _, r in dfG.iterrows():
+        p = (float(r["lon"]), float(r["lat"]))
+        if not in_bbox(p, bbox_ll):
+            continue
+        folium.CircleMarker([p[1], p[0]], radius=7, color="#8b5cf6", fill=True, fill_opacity=0.9, tooltip=str(r.get("gate_reason","t_gate"))).add_to(fg)
+    fg.add_to(m)
+
+# E↔T shared transfer edges (viz)
+if isinstance(df_et, pd.DataFrame) and len(df_et) > 0:
+    fg = folium.FeatureGroup(name=f"E↔T shared edges ({len(df_et)})", show=False)
+    drawn = 0
+    for r in df_et.itertuples(index=False):
+        if getattr(r, "u_kind", "") == "E" and getattr(r, "v_kind", "") == "T":
+            e_id = int(getattr(r, "u"))
+            t_id = int(getattr(r, "v"))
+        elif getattr(r, "u_kind", "") == "T" and getattr(r, "v_kind", "") == "E":
+            t_id = int(getattr(r, "u"))
+            e_id = int(getattr(r, "v"))
+        else:
+            continue
+        if e_id in e_ll and t_id in t_ll:
+            a, b = e_ll[e_id], t_ll[t_id]
+            folium.PolyLine([[a[1], a[0]], [b[1], b[0]]], color="#94a3b8", weight=2, opacity=0.7).add_to(fg)
+            drawn += 1
+    fg.add_to(m)
+    print(f"[viz] E↔T edges drawn: {drawn}/{len(df_et)}")
+
+# T gate → Sea connectors (viz)
+if isinstance(df_tconn, pd.DataFrame) and len(df_tconn) > 0 and isinstance(S_nodes, pd.DataFrame) and len(S_nodes) > 0:
+    fg = folium.FeatureGroup(name=f"Tgate→Sea connectors ({len(df_tconn)})", show=True)
+    drawn = 0
+    for r in df_tconn.itertuples(index=False):
+        tid = int(getattr(r, "t_node_id"))
+        sid = int(getattr(r, "sea_idx"))
+        if tid not in t_ll:
+            continue
+        try:
+            s = S_nodes.iloc[sid]
+            b = (float(s["lon"]), float(s["lat"]))
+        except Exception:
+            continue
+        a = t_ll[tid]
+        if not (in_bbox(a, bbox_ll) or in_bbox(b, bbox_ll)):
+            continue
+        folium.PolyLine([[a[1], a[0]], [b[1], b[0]]], color="#ef4444", weight=2, opacity=0.85).add_to(fg)
+        drawn += 1
+    fg.add_to(m)
+    print(f"[viz] Tgate→Sea connectors drawn: {drawn}/{len(df_tconn)}")
 
     folium.LayerControl(collapsed=False).add_to(m)
 

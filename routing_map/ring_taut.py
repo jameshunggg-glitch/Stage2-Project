@@ -1,25 +1,43 @@
 from __future__ import annotations
-
 from typing import Any, Dict, List, Tuple
-
 import math
-
 from shapely.geometry import LineString
-
+from shapely.prepared import prep
 from .ring_types import RingBuildConfig, XY
 
 
-def _segment_intersects_collision(a: XY, b: XY, collision_geom: Any) -> bool:
+def _segment_intersects_collision(
+    a: XY,
+    b: XY,
+    collision_taut_prep: Any,
+    collision_hard_prep: Any = None,
+) -> bool:
     """
-    Return True if segment a->b intersects collision_geom.
-
-    Conservative: any intersection counts as collision.
+    Return True if segment a->b intersects taut collision OR hard collision.
+    Inputs are PREPARED geometries (prep(...)) for speed.
     """
-    if collision_geom is None or getattr(collision_geom, "is_empty", True):
-        return False
     seg = LineString([a, b])
-    # intersects covers crosses/touches/within; conservative is fine for safety
-    return bool(seg.intersects(collision_geom))
+
+    # hard guardrail (must never cross land)
+    if collision_hard_prep is not None:
+        try:
+            if collision_hard_prep.intersects(seg):
+                return True
+        except Exception:
+            # fall back: if prepared fails for any reason, be conservative
+            return True
+
+    # taut collision
+    if collision_taut_prep is None:
+        return False
+    try:
+        return bool(collision_taut_prep.intersects(seg))
+    except Exception:
+        # conservative fallback
+        return True
+
+
+
 
 
 def choose_cut_indices_closed_ring(pts_m_closed: List[XY], *, max_candidates: int = 16) -> List[int]:
@@ -67,7 +85,8 @@ def _rotate_open_from_cut(pts_m_closed: List[XY], cut_i: int) -> List[XY]:
 def greedy_visibility_simplify_open(
     pts_open: List[XY],
     *,
-    collision_taut_m: Any,
+    collision_taut_prep: Any,
+    collision_hard_prep: Any,
     window_size: int,
 ) -> List[XY]:
     """
@@ -83,10 +102,12 @@ def greedy_visibility_simplify_open(
     kept: List[XY] = [pts_open[0]]
     i = 0
     while i < n - 1:
-        j_hi = min(n - 1, i + w)
+        # cycle-aware guardrail:
+        max_jump = max(2, n // 2)
+        j_hi = min(n - 1, i + min(w, max_jump))
         chosen = i + 1  # always move at least 1 step
         for j in range(j_hi, i, -1):
-            if not _segment_intersects_collision(pts_open[i], pts_open[j], collision_taut_m):
+            if not _segment_intersects_collision(pts_open[i], pts_open[j], collision_taut_prep, collision_hard_prep):
                 chosen = j
                 break
         kept.append(pts_open[chosen])
@@ -99,6 +120,7 @@ def taut_simplify_closed_ring(
     envelope_pts_m_closed: List[XY],
     *,
     collision_taut_m: Any,
+    collision_hard_m: Any,
     cfg: RingBuildConfig,
 ) -> Tuple[List[XY], Dict[str, Any]]:
     """
@@ -123,6 +145,28 @@ def taut_simplify_closed_ring(
     best = None
     best_stats = None
 
+    # ------------------------------------------------------------
+    # PREP collisions ONCE (critical for performance)
+    # ------------------------------------------------------------
+    eps = 1.0  # meters; boundary-touch tolerance
+    collision_hard_prep = None
+    if collision_hard_m is not None and (not getattr(collision_hard_m, "is_empty", True)):
+        collision_hard_prep = prep(collision_hard_m)
+
+    collision_taut_geom = collision_taut_m
+    if collision_taut_geom is None or getattr(collision_taut_geom, "is_empty", True):
+        collision_taut_prep = None
+    else:
+        # allow boundary touch by shrinking ONCE (not in inner-loop)
+        try:
+            g_shrink = collision_taut_geom.buffer(-eps)
+            if g_shrink is not None and (not getattr(g_shrink, "is_empty", True)):
+                collision_taut_geom = g_shrink
+        except Exception:
+            pass
+        collision_taut_prep = prep(collision_taut_geom)
+
+
     for cut_i in cut_candidates:
         if tries >= int(cfg.taut_max_tries):
             break
@@ -130,7 +174,7 @@ def taut_simplify_closed_ring(
 
         open_pts = _rotate_open_from_cut(pts_closed, cut_i)
         simplified_open = greedy_visibility_simplify_open(
-            open_pts, collision_taut_m=collision_taut_m, window_size=int(cfg.taut_window_size)
+            open_pts, collision_taut_prep=collision_taut_prep, collision_hard_prep=collision_hard_prep, window_size=int(cfg.taut_window_size)
         )
 
         # close
@@ -144,7 +188,7 @@ def taut_simplify_closed_ring(
 
         # validate all segments (including closing)
         for k in range(len(simplified_closed) - 1):
-            if _segment_intersects_collision(simplified_closed[k], simplified_closed[k + 1], collision_taut_m):
+            if _segment_intersects_collision(simplified_closed[k], simplified_closed[k + 1],  collision_taut_prep, collision_hard_prep,):
                 ok = False
                 reason = f"segment_collision@{k}"
                 break
@@ -169,8 +213,9 @@ def taut_simplify_closed_ring(
     # fallback: return envelope if nothing works
     if best is None:
         return pts_closed, {"ok": False, "reason": "no_candidates"}
-    return pts_closed, {
+    return best, {
         "ok": False,
         "reason": "fallback_to_envelope",
         "best_attempt": best_stats,
     }
+

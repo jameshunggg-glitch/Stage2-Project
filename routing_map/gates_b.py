@@ -17,15 +17,19 @@ def gate_to_sea_candidates(
     r_max_km: float,
 ) -> list[int]:
     """Return candidate sea node indices near gate (within r_max_km)."""
+    n = 0 if S_nodes is None else len(S_nodes)
+    if n <= 0:
+        return []
+
+    k = min(int(top_n), n)          # ✅ 关键：k 不能超过训练点数
+    if k <= 0:
+        return []
     r = float(r_max_km) * 1000.0
-    dist, idx = kdt.query([gate_xy], k=int(top_n), return_distance=True)
+    dist, idx = kdt.query([gate_xy], k=k, return_distance=True)
     dist = dist[0]
     idx = idx[0]
-    out: list[int] = []
-    for d, i in zip(dist, idx):
-        if float(d) <= r:
-            out.append(int(i))
-    return out
+    keep = [int(i) for d, i in zip(dist, idx) if float(d) <= r]
+    return keep
 
 
 def build_gateB_connectors(
