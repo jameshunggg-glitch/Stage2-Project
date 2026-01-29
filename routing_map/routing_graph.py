@@ -510,20 +510,24 @@ def build_base_graph(
                 except Exception:
                     continue
 
-                # Determine direction (E->T) robustly
-                u_e = u_id in e_map
-                v_e = v_id in e_map
-                u_t = u_id in t_map
-                v_t = v_id in t_map
-
+                # Determine direction (E->T) robustly.
+                # Preferred convention (e_t_transfer_v2): u=e_node_id, v=t_node_id.
                 e_id = t_id = None
-                if u_e and v_t:
+                if etype.startswith("E_T"):
                     e_id, t_id = u_id, v_id
-                elif v_e and u_t:
-                    e_id, t_id = v_id, u_id
-                else:
-                    # can't resolve endpoints
-                    continue
+                # Fallback for older experiments: infer by membership.
+                if e_id is None or t_id is None or (e_id not in e_map) or (t_id not in t_map):
+                    u_e = u_id in e_map
+                    v_e = v_id in e_map
+                    u_t = u_id in t_map
+                    v_t = v_id in t_map
+                    if u_e and v_t:
+                        e_id, t_id = u_id, v_id
+                    elif v_e and u_t:
+                        e_id, t_id = v_id, u_id
+                    else:
+                        # can't resolve endpoints
+                        continue
 
                 u = e_map.get(e_id)
                 v = t_map.get(t_id)

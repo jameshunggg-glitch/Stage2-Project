@@ -205,7 +205,6 @@ def _get_or_build_sea_adjacency(out: Dict[str, Any]) -> Dict[int, List[int]]:
     return adj
 
 
-
 def _interp_lonlat(a: LonLat, b: LonLat, t: float) -> LonLat:
     """Linear interpolation in lon/lat with simple dateline-safe lon unwrap."""
     lon1, lat1 = float(a[0]), float(a[1])
@@ -659,7 +658,11 @@ def _sea_first_candidates(
             seen = set()
             uniq: List[SnapCandidate] = []
             for c in sorted(cands_all, key=lambda cc: cc.dist_km):
-                key = (round(float(c.node_ll[0]), 6), round(float(c.node_ll[1]), 6), int(c.component) if c.component is not None else None)
+                key = (
+                    round(float(c.node_ll[0]), 6),
+                    round(float(c.node_ll[1]), 6),
+                    int(c.component) if c.component is not None else None,
+                )
                 if key in seen:
                     continue
                 seen.add(key)
@@ -892,6 +895,8 @@ def snap_pair_component_aware(
     start_ll: LonLat,
     end_ll: LonLat,
     *,
+    start_policy: Optional[str] = None,  # NEW: "R" or "S" or None
+    end_policy: Optional[str] = None,    # NEW: "R" or "S" or None
     k_near: int = 30,
     r_max_km: float = 150.0,
     k_inject: int = 4,
@@ -914,44 +919,55 @@ def snap_pair_component_aware(
     We pass the opposite endpoint as target_ll so snapping can detect "bad nearest entrance"
     and augment virtual candidates around adjacent sea edges.
     """
-    sres = snap_to_sea_candidates(
-        out,
-        start_ll,
-        k_near=k_near,
-        r_max_km=r_max_km,
-        prefer_ok_set=prefer_ok_set,
-        allow_fallback_non_ok=allow_fallback_non_ok,
-        allow_radius_fallback=allow_radius_fallback,
-        do_nudge=do_nudge,
-        k_near_coast=k_near_coast,
-        r_max_km_coast=r_max_km_coast,
-        target_ll=end_ll,
-        enable_local_entrance_aug=enable_local_entrance_aug,
-        aug_dist_trigger_km=aug_dist_trigger_km,
-        aug_delta_end_km=aug_delta_end_km,
-        aug_angle_trigger_deg=aug_angle_trigger_deg,
-        aug_seed_neighbors_cap=aug_seed_neighbors_cap,
-        aug_seed_count=aug_seed_count,
-    )
-    eres = snap_to_sea_candidates(
-        out,
-        end_ll,
-        k_near=k_near,
-        r_max_km=r_max_km,
-        prefer_ok_set=prefer_ok_set,
-        allow_fallback_non_ok=allow_fallback_non_ok,
-        allow_radius_fallback=allow_radius_fallback,
-        do_nudge=do_nudge,
-        k_near_coast=k_near_coast,
-        r_max_km_coast=r_max_km_coast,
-        target_ll=start_ll,
-        enable_local_entrance_aug=enable_local_entrance_aug,
-        aug_dist_trigger_km=aug_dist_trigger_km,
-        aug_delta_end_km=aug_delta_end_km,
-        aug_angle_trigger_deg=aug_angle_trigger_deg,
-        aug_seed_neighbors_cap=aug_seed_neighbors_cap,
-        aug_seed_count=aug_seed_count,
-    )
+    sp = (start_policy or "S").upper()
+    ep = (end_policy or "S").upper()
+        # ---- START ----
+    if sp == "R":
+        sres = snap_to_ring_candidates(out, start_ll, k_near=k_near, prefer="auto", target_ll=end_ll)
+    else:
+        sres = snap_to_sea_candidates(
+            out,
+            start_ll,
+            k_near=k_near,
+            r_max_km=r_max_km,
+            prefer_ok_set=prefer_ok_set,
+            allow_fallback_non_ok=allow_fallback_non_ok,
+            allow_radius_fallback=allow_radius_fallback,
+            do_nudge=do_nudge,
+            k_near_coast=k_near_coast,
+            r_max_km_coast=r_max_km_coast,
+            target_ll=end_ll,
+            enable_local_entrance_aug=enable_local_entrance_aug,
+            aug_dist_trigger_km=aug_dist_trigger_km,
+            aug_delta_end_km=aug_delta_end_km,
+            aug_angle_trigger_deg=aug_angle_trigger_deg,
+            aug_seed_neighbors_cap=aug_seed_neighbors_cap,
+            aug_seed_count=aug_seed_count,
+        )
+
+    # ---- END ----
+    if ep == "R":
+        eres = snap_to_ring_candidates(out, end_ll, k_near=k_near, prefer="auto", target_ll=start_ll)
+    else:
+        eres = snap_to_sea_candidates(
+            out,
+            end_ll,
+            k_near=k_near,
+            r_max_km=r_max_km,
+            prefer_ok_set=prefer_ok_set,
+            allow_fallback_non_ok=allow_fallback_non_ok,
+            allow_radius_fallback=allow_radius_fallback,
+            do_nudge=do_nudge,
+            k_near_coast=k_near_coast,
+            r_max_km_coast=r_max_km_coast,
+            target_ll=start_ll,
+            enable_local_entrance_aug=enable_local_entrance_aug,
+            aug_dist_trigger_km=aug_dist_trigger_km,
+            aug_delta_end_km=aug_delta_end_km,
+            aug_angle_trigger_deg=aug_angle_trigger_deg,
+            aug_seed_neighbors_cap=aug_seed_neighbors_cap,
+            aug_seed_count=aug_seed_count,
+        )
 
     dbg: Dict[str, Any] = {
         "start_reason": sres.reason,
@@ -973,6 +989,22 @@ def snap_pair_component_aware(
             reason="snap_failed",
             debug=dbg,
         )
+    
+    # NEW: ring-world bypass component logic
+    if sp == "R" or ep == "R":
+        spick = sorted(sres.candidates, key=lambda c: c.dist_km)[: max(1, int(k_inject))]
+        epick = sorted(eres.candidates, key=lambda c: c.dist_km)[: max(1, int(k_inject))]
+        return SnapPairResult(
+            start=sres,
+            end=eres,
+            chosen_common_component=None,
+            largest_component=None,
+            start_pick=spick,
+            end_pick=epick,
+            reason="ring_policy_bypass_component",
+            debug=dbg,
+        )
+
 
     start_comps = {c.component for c in sres.candidates if c.component is not None}
     end_comps = {c.component for c in eres.candidates if c.component is not None}
@@ -1087,6 +1119,271 @@ def inject_point_edges(
 
 
 
+# ============================================================
+# Multi-world snapping (Ring world vs Sea world)
+# ============================================================
+
+def _get_ring_nodes(out: Dict[str, Any]) -> Tuple[Optional[pd.DataFrame], Optional[pd.DataFrame]]:
+    rg = out.get("ring_graph", {}) or {}
+    E_nodes = rg.get("E_nodes", None)
+    T_nodes = rg.get("T_nodes", None)
+    if not isinstance(E_nodes, pd.DataFrame):
+        E_nodes = None
+    if not isinstance(T_nodes, pd.DataFrame):
+        T_nodes = None
+    return E_nodes, T_nodes
+
+
+def _build_kdt_for_nodes(
+    out: Dict[str, Any],
+    df: pd.DataFrame,
+    *,
+    cache_key: str,
+) -> Optional["Any"]:
+    """Build (and cache) a KDTree for a node dataframe in metric coords.
+
+    Uses existing x_m/y_m columns if present, else projects lon/lat using out["proj"].
+    """
+    if df is None or len(df) == 0:
+        return None
+
+    # cache
+    kdt = out.get(cache_key, None)
+    if kdt is not None:
+        return kdt
+
+    if "x_m" in df.columns and "y_m" in df.columns:
+        xy = df[["x_m", "y_m"]].to_numpy(dtype=float, copy=False)
+    else:
+        # project lon/lat to metric
+        lon = df["lon"].to_numpy(dtype=float, copy=False)
+        lat = df["lat"].to_numpy(dtype=float, copy=False)
+        xy = np.zeros((len(df), 2), dtype=float)
+        for i in range(len(df)):
+            xy[i, :] = _point_ll_to_m(out, (float(lon[i]), float(lat[i])))
+    
+    try:
+        from sklearn.neighbors import KDTree  # type: ignore
+        kdt = KDTree(xy, leaf_size=40)
+    except Exception:
+        try:
+            from scipy.spatial import cKDTree  # type: ignore
+            kdt = cKDTree(xy)
+        except Exception:
+            return None
+
+    out[cache_key] = kdt
+    return kdt
+
+
+def _nearest_node_dist_km(out: Dict[str, Any], df: Optional[pd.DataFrame], kdt: Any, p_ll: LonLat) -> float:
+    if df is None or kdt is None or len(df) == 0:
+        return float("inf")
+
+    x, y = _point_ll_to_m(out, p_ll)
+    try:
+        idxs = _kdt_query_indices(kdt, float(x), float(y), k=1)
+        if not idxs:
+            return float("inf")
+        row = df.iloc[int(idxs[0])]
+
+        # 用 meters 算距離（因為 x_m/y_m 就是 meters）
+        if "x_m" in df.columns and "y_m" in df.columns:
+            dx = float(x) - float(row["x_m"])
+            dy = float(y) - float(row["y_m"])
+            return (dx * dx + dy * dy) ** 0.5 / 1000.0
+
+        # fallback: haversine
+        ll = (float(row["lon"]), float(row["lat"]))
+        return float(haversine_km(p_ll, ll))
+    except Exception:
+        # fallback: haversine brute
+        best = float("inf")
+        for _, r in df.iterrows():
+            ll = (float(r["lon"]), float(r["lat"]))
+            best = min(best, float(haversine_km(p_ll, ll)))
+        return best
+
+
+
+def snap_to_ring_candidates(
+    out: Dict[str, Any],
+    p_ll: LonLat,
+    *,
+    k_near: int = 30,
+    prefer: str = "auto",
+    target_ll: Optional[LonLat] = None,
+) -> SnapResult:
+    """Return ring-node candidates near p_ll.
+
+    prefer:
+      - "E": only E ring nodes
+      - "T": only T ring nodes
+      - "auto": choose closer between E and T (by nearest-node distance)
+    """
+    p_ll0 = normalize_lonlat(p_ll)
+    dbg: Dict[str, Any] = {"mode": "ring", "prefer": prefer}
+
+    E_nodes, T_nodes = _get_ring_nodes(out)
+    if E_nodes is None and T_nodes is None:
+        return SnapResult(
+            p_input_ll=p_ll0,
+            p_used_ll=p_ll0,
+            was_nudged=False,
+            in_collision_input=False,
+            candidates=[],
+            reason="missing_ring_nodes",
+            debug=dbg,
+        )
+
+    # KD trees
+    e_kdt = _build_kdt_for_nodes(out, E_nodes, cache_key="e_nodes_kdt") if E_nodes is not None else None
+    t_kdt = _build_kdt_for_nodes(out, T_nodes, cache_key="t_nodes_kdt") if T_nodes is not None else None
+
+    # choose set
+    if prefer.upper() == "E":
+        chosen_df, chosen_kdt, chosen_tag = E_nodes, e_kdt, "E"
+    elif prefer.upper() == "T":
+        chosen_df, chosen_kdt, chosen_tag = T_nodes, t_kdt, "T"
+    else:
+        dE = _nearest_node_dist_km(out, E_nodes, e_kdt, p_ll0) if E_nodes is not None else float("inf")
+        dT = _nearest_node_dist_km(out, T_nodes, t_kdt, p_ll0) if T_nodes is not None else float("inf")
+        chosen_tag = "E" if dE <= dT else "T"
+        chosen_df, chosen_kdt = (E_nodes, e_kdt) if chosen_tag == "E" else (T_nodes, t_kdt)
+        dbg.update({"dE_km": float(dE), "dT_km": float(dT), "chosen": chosen_tag})
+
+    if chosen_df is None or chosen_kdt is None or len(chosen_df) == 0:
+        return SnapResult(
+            p_input_ll=p_ll0,
+            p_used_ll=p_ll0,
+            was_nudged=False,
+            in_collision_input=False,
+            candidates=[],
+            reason="no_ring_candidates",
+            debug=dbg,
+        )
+
+    # query nearest
+    x, y = _point_ll_to_m(out, p_ll0)
+    kq = max(1, min(int(k_near), len(chosen_df)))
+    try:
+        idxs = _kdt_query_indices(chosen_kdt, float(x), float(y), k=kq)
+    except Exception as e:
+        return SnapResult(
+            p_input_ll=p_ll0,
+            p_used_ll=p_ll0,
+            was_nudged=False,
+            in_collision_input=False,
+            candidates=[],
+            reason="ring_kdt_query_failed",
+            debug={**dbg, "error": repr(e)},
+        )
+
+    cands: List[SnapCandidate] = []
+    for i in idxs:
+        try:
+            row = chosen_df.iloc[int(i)]
+            ll = (float(row["lon"]), float(row["lat"]))
+
+            # meters distance (preferred)
+            if "x_m" in chosen_df.columns and "y_m" in chosen_df.columns:
+                dx = float(x) - float(row["x_m"])
+                dy = float(y) - float(row["y_m"])
+                dist_km = (dx * dx + dy * dy) ** 0.5 / 1000.0
+            else:
+                dist_km = float(haversine_km(p_ll0, ll))
+
+            node_idx = int(row["node_id"]) if "node_id" in chosen_df.columns else int(i)
+            cands.append(SnapCandidate(node_idx=node_idx, node_ll=ll, dist_km=dist_km, component=None, ok=True))
+        except Exception:
+            continue
+
+    cands.sort(key=lambda c: c.dist_km)
+
+    return SnapResult(
+        p_input_ll=p_ll0,
+        p_used_ll=p_ll0,
+        was_nudged=False,
+        in_collision_input=False,
+        candidates=cands,
+        reason=f"ring_{chosen_tag}_ok",
+        debug=dbg,
+    )
+
+
+def compute_multiworld_policies_for_point(
+    out: Dict[str, Any],
+    p_ll: LonLat,
+    *,
+    R_NEAR_COAST_KM: float = 120.0,
+    S_MAX_SNAP_KM: float = 200.0,
+) -> Dict[str, Any]:
+    """Compute which worlds (R,S) should be attempted for this endpoint.
+
+    Heuristics:
+    - If in collision -> must include R
+    - If within R_NEAR_COAST_KM of ring nodes -> include R, else may prune R
+    - If nearest sea node distance > S_MAX_SNAP_KM -> prune S
+    """
+    p_ll0 = normalize_lonlat(p_ll)
+
+    # collision
+    collision_prep = None
+    geom_m = _get_collision_geom_m(out)
+    if geom_m is not None:
+        try:
+            collision_prep = prep(geom_m)
+        except Exception:
+            collision_prep = None
+
+    in_collision = bool(_is_in_collision(out, p_ll0, collision_prep=collision_prep)) if geom_m is not None else False
+
+    # distances
+    E_nodes, T_nodes = _get_ring_nodes(out)
+    e_kdt = _build_kdt_for_nodes(out, E_nodes, cache_key="e_nodes_kdt") if E_nodes is not None else None
+    t_kdt = _build_kdt_for_nodes(out, T_nodes, cache_key="t_nodes_kdt") if T_nodes is not None else None
+    dE = _nearest_node_dist_km(out, E_nodes, e_kdt, p_ll0) if E_nodes is not None else float("inf")
+    dT = _nearest_node_dist_km(out, T_nodes, t_kdt, p_ll0) if T_nodes is not None else float("inf")
+    d_ring = float(min(dE, dT))
+
+    # sea nearest dist
+    d_sea = float("inf")
+    try:
+        S_nodes = out.get("S_nodes", None)
+        sea_kdt = out.get("sea_kdt", None)
+        if isinstance(S_nodes, pd.DataFrame) and sea_kdt is not None and len(S_nodes) > 0:
+            x, y = _point_ll_to_m(out, p_ll0)
+            d, _ = sea_kdt.query([x, y], k=1)
+            d_sea = float(d) / 1000.0
+    except Exception:
+        d_sea = float("inf")
+
+    policies = set(["R", "S"])
+
+    # prune ring if far (unless collision)
+    if (not in_collision) and (d_ring > float(R_NEAR_COAST_KM)):
+        policies.discard("R")
+
+    # prune sea if too far
+    if d_sea > float(S_MAX_SNAP_KM):
+        policies.discard("S")
+
+    # always keep at least one
+    if not policies:
+        policies = set(["R"]) if in_collision else set(["S"])
+
+    return {
+        "p_ll": p_ll0,
+        "in_collision": in_collision,
+        "d_ring_km": d_ring,
+        "dE_km": float(dE),
+        "dT_km": float(dT),
+        "d_sea_km": d_sea,
+        "policies": sorted(list(policies)),
+    }
+
+
+
 __all__ = [
     "SnapCandidate",
     "SnapResult",
@@ -1096,4 +1393,7 @@ __all__ = [
     "snap_to_sea_candidates",
     "snap_pair_component_aware",
     "inject_point_edges",
+    # multi-world
+    "snap_to_ring_candidates",
+    "compute_multiworld_policies_for_point",
 ]

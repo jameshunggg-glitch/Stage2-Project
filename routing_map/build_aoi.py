@@ -27,6 +27,8 @@ from .rings import build_coast_rings_smooth_v2, build_envelope_and_taut_rings_v1
 from .ring_graph import build_ring_nodes_edges, RingGraphBuildParams
 from .geom_utils import expand_bbox_ll
 from routing_map.e_t_transfer_v2 import build_e_t_transfer_edges, ETRampConfig
+from .t_gate_connectors import build_tgate_sea_connectors, TGateSeaConnectorParams
+
 
 
 def _pad_bbox_ll(bbox_ll, pad_deg: float):
@@ -345,6 +347,39 @@ def build_aoi(cfg: RoutingMapConfig) -> Dict[str, Any]:
 
     # --- Gate-B connectors (Gate -> Sea) ---
     collision_prep = prep(layers["COLLISION_M"])
+    # --- T-gate -> Sea connectors (T-ring gate candidates -> Sea nodes) ---
+    # (keep sea_idx as original S_nodes row-index, so viz can do S_nodes.iloc[sea_idx])
+    tgate_sea_connectors = None
+    try:
+        _tmp_out = {
+            "ring_graph": ring_graph,
+            "S_nodes": S_nodes,
+            "proj": proj,
+            "layers": layers,
+            "collision_prep": collision_prep,
+        }
+        tgate_sea_connectors = build_tgate_sea_connectors(
+            _tmp_out,
+            params=TGateSeaConnectorParams(
+                k_connect=2,
+                topN=60,
+                r_connect_km=200.0,
+                enable_sector_filter=False,
+                sector_deg=110.0,
+                do_collision_check=True,
+                do_repair=True,
+            ),
+        )
+        # optional: only keep connectors to "ok" sea nodes (largest component / deg_min filtered)
+        if tgate_sea_connectors is not None and len(tgate_sea_connectors) > 0 and sea_ok_set is not None:
+            ok = set(sea_ok_set)
+            tgate_sea_connectors = (
+                tgate_sea_connectors[tgate_sea_connectors["sea_idx"].astype(int).isin(ok)]
+                .reset_index(drop=True)
+            )
+    except Exception:
+        tgate_sea_connectors = None
+
     gateB_connectors = build_gateB_connectors(
         Gate_all_cov, S_nodes,
         sea_ok_set=sea_ok_set,
@@ -406,6 +441,8 @@ def build_aoi(cfg: RoutingMapConfig) -> Dict[str, Any]:
         "sea_graph": G,
         "sea_kdt": kdt,
         "sea_ok_set": sea_ok_set,
+        "tgate_sea_connectors": tgate_sea_connectors,
+
 
         # Gate-B outputs
         "gateB_connectors": gateB_connectors,
