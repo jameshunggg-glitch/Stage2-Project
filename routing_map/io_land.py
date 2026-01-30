@@ -3,10 +3,32 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Tuple, List, Iterable
+from shapely.ops import unary_union
+import pandas as pd
+
 
 import geopandas as gpd
 from shapely.geometry import box, Polygon, MultiPolygon, GeometryCollection
 from shapely.geometry.base import BaseGeometry
+
+def _split_bbox_dateline(
+    bbox_ll: Tuple[float, float, float, float]
+) -> List[Tuple[float, float, float, float]]:
+    min_lon, min_lat, max_lon, max_lat = [float(x) for x in bbox_ll]
+    if min_lon <= max_lon:
+        return [(min_lon, min_lat, max_lon, max_lat)]
+    # crossing dateline
+    return [
+        (min_lon, min_lat, 180.0, max_lat),
+        (-180.0,  min_lat, max_lon, max_lat),
+    ]
+
+
+def _bbox_geom_from_parts(
+    parts: List[Tuple[float, float, float, float]]
+):
+    # union of one or two boxes (covers dateline-crossing window correctly)
+    return unary_union([box(*p) for p in parts])
 
 
 def _iter_polygons(geom: BaseGeometry) -> Iterable[Polygon]:
@@ -48,21 +70,32 @@ def load_polys_in_bbox(
     if not shp_path.exists():
         raise FileNotFoundError(f"Land shapefile not found: {shp_path}")
 
-    min_lon, min_lat, max_lon, max_lat = [float(x) for x in bbox_ll]
-    bbox_tuple = (min_lon, min_lat, max_lon, max_lat)
-    bbox_geom = box(*bbox_tuple)
+    parts = _split_bbox_dateline(bbox_ll)
+    bbox_geom = _bbox_geom_from_parts(parts)
+
 
     # ---- read ----
+
     read_used_bbox = True
+    gdfs = []
     try:
-        # geopandas accepts bbox as (minx, miny, maxx, maxy)
-        gdf = gpd.read_file(shp_path, bbox=bbox_tuple)
+        for p in parts:
+            g = gpd.read_file(shp_path, bbox=p)  # geopandas bbox: (minx,miny,maxx,maxy)
+            if not g.empty:
+                gdfs.append(g)
     except Exception:
+        # 如果 bbox 讀取整個失敗，就 fallback 讀全檔（跟你原本一致）
         read_used_bbox = False
         gdf = gpd.read_file(shp_path)
+    else:
+        # bbox 讀取成功：concat
+        if not gdfs:
+            return []
+        gdf = gpd.GeoDataFrame(pd.concat(gdfs, ignore_index=True), crs=gdfs[0].crs)
 
     if gdf.empty:
         return []
+    
 
     # ---- CRS safety ----
     try:
@@ -111,7 +144,7 @@ def load_polys_in_bbox(
         print(
             f"[io_land] read_used_bbox={read_used_bbox} "
             f"features_after_filter={len(gdf)} polygon_parts_kept={len(kept)} "
-            f"bbox_ll={bbox_ll}"
+            f"parts={parts} bbox_ll={bbox_ll}"
         )
 
     return kept

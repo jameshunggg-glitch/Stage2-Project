@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
+import math
+
 import folium
 import pandas as pd
 from folium import MacroElement
@@ -109,22 +111,66 @@ def add_select_all_none_layer_control(
 
 
 
+# === Dateline visualization mode (Folium/Leaflet) ===
+# Leaflet repeats the world horizontally. When an AOI bbox crosses the antimeridian
+# (min_lon > max_lon), we can render everything continuously by shifting the left-side
+# longitudes ([-180, max_lon]) by +360 so bbox/path/nodes/edges live in one world copy.
+DATELINE_VIZ_MODE = "unwrap360"  # or "split"
+
+def _bbox_crosses_dateline(bbox_ll: Optional[BBoxLL]) -> bool:
+    if bbox_ll is None:
+        return False
+    min_lon, _, max_lon, _ = map(float, bbox_ll)
+    return min_lon > max_lon
+
+def _lon_viz(lon: float, bbox_ll: Optional[BBoxLL]) -> float:
+    x = float(lon)
+    if DATELINE_VIZ_MODE == "unwrap360" and _bbox_crosses_dateline(bbox_ll) and bbox_ll is not None:
+        min_lon, _, max_lon, _ = map(float, bbox_ll)
+        if x <= max_lon:
+            x += 360.0
+    return x
+
+def _bbox_bounds_viz(bbox_ll: BBoxLL) -> BBoxLL:
+    min_lon, min_lat, max_lon, max_lat = map(float, bbox_ll)
+    if DATELINE_VIZ_MODE == "unwrap360" and min_lon > max_lon:
+        return (min_lon, min_lat, max_lon + 360.0, max_lat)
+    return (min_lon, min_lat, max_lon, max_lat)
+
 def _in_bbox(p: LonLat, bbox_ll: Optional[BBoxLL]) -> bool:
     if bbox_ll is None:
         return True
     min_lon, min_lat, max_lon, max_lat = map(float, bbox_ll)
     lon, lat = float(p[0]), float(p[1])
-    return (min_lon <= lon <= max_lon) and (min_lat <= lat <= max_lat)
-
+    if not (min_lat <= lat <= max_lat):
+        return False
+    if min_lon <= max_lon:
+        return (min_lon <= lon <= max_lon)
+    # crosses dateline
+    return (lon >= min_lon) or (lon <= max_lon)
 
 def make_base_map(bbox_ll: BBoxLL, *, zoom_start: int = 5, control_scale: bool = True) -> folium.Map:
     min_lon, min_lat, max_lon, max_lat = map(float, bbox_ll)
-    center = [(min_lat + max_lat) / 2, (min_lon + max_lon) / 2]
-    m = folium.Map(location=center, zoom_start=zoom_start, control_scale=control_scale)
-    folium.Rectangle(bounds=[[min_lat, min_lon], [max_lat, max_lon]], fill=False, weight=3, opacity=0.9).add_to(m)
-    m.fit_bounds([[min_lat, min_lon], [max_lat, max_lon]])
-    return m
+    crosses = (min_lon > max_lon)
 
+    if not crosses:
+        center_lon = (min_lon + max_lon) / 2.0
+    else:
+        center_lon = (min_lon + (max_lon + 360.0)) / 2.0
+
+    v_min_lon, v_min_lat, v_max_lon, v_max_lat = _bbox_bounds_viz(bbox_ll)
+    center = [(min_lat + max_lat) / 2.0, _lon_viz(center_lon, bbox_ll)]
+
+    m = folium.Map(location=center, zoom_start=zoom_start, control_scale=control_scale)
+    setattr(m, "_routing_bbox_ll", tuple(map(float, bbox_ll)))
+
+    if DATELINE_VIZ_MODE == "unwrap360" and crosses:
+        folium.Rectangle(bounds=[[v_min_lat, v_min_lon], [v_max_lat, v_max_lon]], fill=False, weight=3, opacity=0.9, color="blue").add_to(m)
+        m.fit_bounds([[v_min_lat, v_min_lon], [v_max_lat, v_max_lon]])
+    else:
+        folium.Rectangle(bounds=[[min_lat, min_lon], [max_lat, max_lon]], fill=False, weight=3, opacity=0.9, color="blue").add_to(m)
+        m.fit_bounds([[min_lat, min_lon], [max_lat, max_lon]])
+    return m
 
 def add_points_layer(
     m: folium.Map,
@@ -135,14 +181,108 @@ def add_points_layer(
     show: bool = True,
     bbox_ll: Optional[BBoxLL] = None,
 ) -> None:
+    if bbox_ll is None:
+        bbox_ll = getattr(m, "_routing_bbox_ll", None)
     fg = folium.FeatureGroup(name=name, show=show)
     for lon, lat in pts_ll:
         p = (float(lon), float(lat))
         if not _in_bbox(p, bbox_ll):
             continue
-        folium.CircleMarker([p[1], p[0]], radius=int(radius)).add_to(fg)
+        folium.CircleMarker([p[1], _lon_viz(p[0], bbox_ll)], radius=int(radius)).add_to(fg)
     fg.add_to(m)
 
+
+# === Great-circle densification (for visualization) ===
+_EARTH_R_KM = 6371.0088
+
+def _ll_to_unitvec(lon_deg: float, lat_deg: float) -> Tuple[float, float, float]:
+    lon = math.radians(float(lon_deg))
+    lat = math.radians(float(lat_deg))
+    clat = math.cos(lat)
+    return (clat * math.cos(lon), clat * math.sin(lon), math.sin(lat))
+
+def _unitvec_to_ll(v: Tuple[float, float, float]) -> LonLat:
+    x, y, z = v
+    lon = math.degrees(math.atan2(y, x))
+    hyp = math.hypot(x, y)
+    lat = math.degrees(math.atan2(z, hyp))
+    return (lon, lat)
+
+def _dot(u: Tuple[float, float, float], v: Tuple[float, float, float]) -> float:
+    return u[0]*v[0] + u[1]*v[1] + u[2]*v[2]
+
+def _norm(u: Tuple[float, float, float]) -> float:
+    return math.sqrt(_dot(u, u))
+
+def _scale(u: Tuple[float, float, float], a: float) -> Tuple[float, float, float]:
+    return (u[0]*a, u[1]*a, u[2]*a)
+
+def _add(u: Tuple[float, float, float], v: Tuple[float, float, float]) -> Tuple[float, float, float]:
+    return (u[0]+v[0], u[1]+v[1], u[2]+v[2])
+
+def _normalize(u: Tuple[float, float, float]) -> Tuple[float, float, float]:
+    n = _norm(u)
+    if n <= 1e-15:
+        return (0.0, 0.0, 0.0)
+    return (u[0]/n, u[1]/n, u[2]/n)
+
+def _central_angle_rad(u: Tuple[float, float, float], v: Tuple[float, float, float]) -> float:
+    d = max(-1.0, min(1.0, _dot(u, v)))
+    return math.acos(d)
+
+def _slerp(u: Tuple[float, float, float], v: Tuple[float, float, float], t: float, omega: float) -> Tuple[float, float, float]:
+    if omega < 1e-12:
+        return u
+    so = math.sin(omega)
+    a = math.sin((1.0 - t) * omega) / so
+    b = math.sin(t * omega) / so
+    return _normalize(_add(_scale(u, a), _scale(v, b)))
+
+def _densify_great_circle_ll(p0: LonLat, p1: LonLat, *, step_km: float = 20.0) -> List[LonLat]:
+    """Densify the great-circle segment between two lon/lat points.
+
+    Notes:
+    - Works with "continuous" longitudes (e.g. 190 == -170) and preserves continuity
+      relative to p0 to avoid jumps in Leaflet visualization.
+    """
+    lon0, lat0 = float(p0[0]), float(p0[1])
+    lon1, lat1 = float(p1[0]), float(p1[1])
+
+    u = _ll_to_unitvec(lon0, lat0)
+    v = _ll_to_unitvec(lon1, lat1)
+    omega = _central_angle_rad(u, v)
+    dist_km = _EARTH_R_KM * omega
+
+    if step_km <= 0 or dist_km <= step_km:
+        return [(lon0, lat0), (lon1, lat1)]
+
+    n_seg = max(1, int(math.ceil(dist_km / float(step_km))))
+    out: List[LonLat] = []
+    for k in range(n_seg + 1):
+        t = k / n_seg
+        w = _slerp(u, v, t, omega)
+        lon, lat = _unitvec_to_ll(w)
+
+        # keep lon continuous w.r.t lon0
+        d = lon - lon0
+        if d > 180.0:
+            lon -= 360.0
+        elif d < -180.0:
+            lon += 360.0
+
+        out.append((lon, lat))
+    return out
+
+def _densify_polyline_gc_ll(path_ll: Sequence[LonLat], *, step_km: float = 20.0) -> List[LonLat]:
+    if not path_ll or len(path_ll) < 2:
+        return []
+    out: List[LonLat] = []
+    for a, b in zip(path_ll, path_ll[1:]):
+        seg = _densify_great_circle_ll(a, b, step_km=step_km)
+        if out:
+            seg = seg[1:]  # avoid duplicating join point
+        out.extend(seg)
+    return out
 
 def add_path_layer(
     m: folium.Map,
@@ -152,13 +292,25 @@ def add_path_layer(
     weight: int = 4,
     opacity: float = 0.95,
     show: bool = True,
+    bbox_ll: Optional[BBoxLL] = None,
+    geodesic: bool = False,
+    geodesic_step_km: float = 20.0,
 ) -> None:
     if not path_ll or len(path_ll) < 2:
         return
+    if bbox_ll is None:
+        bbox_ll = getattr(m, "_routing_bbox_ll", None)
     fg = folium.FeatureGroup(name=name, show=show)
-    folium.PolyLine([[lat, lon] for (lon, lat) in path_ll], color="red", weight=int(weight), opacity=float(opacity)).add_to(fg)
-    fg.add_to(m)
 
+    # Leaflet draws straight segments in (WebMercator) map space. If you want the path
+    # to *look* like a great-circle, we densify each segment along the great-circle
+    # before drawing (purely for visualization; this does not change routing).
+    pts_ll_viz = [(_lon_viz(float(lon), bbox_ll), float(lat)) for (lon, lat) in path_ll]
+    if geodesic:
+        pts_ll_viz = _densify_polyline_gc_ll(pts_ll_viz, step_km=float(geodesic_step_km))
+
+    folium.PolyLine([[lat, lon] for (lon, lat) in pts_ll_viz], color="red", weight=int(weight), opacity=float(opacity)).add_to(fg)
+    fg.add_to(m)
 
 def add_sea_layers(
     m: folium.Map,
@@ -171,8 +323,12 @@ def add_sea_layers(
     show: bool = True,
     bbox_ll: Optional[BBoxLL] = None,
 ) -> None:
+    if bbox_ll is None:
+        bbox_ll = getattr(m, "_routing_bbox_ll", None)
+
     S_nodes = out.get("S_nodes")
     S_edges = out.get("S_edges")
+
     if isinstance(S_nodes, pd.DataFrame) and len(S_nodes) > 0 and show_nodes:
         df = S_nodes
         if node_sample is not None and len(df) > int(node_sample):
@@ -182,73 +338,70 @@ def add_sea_layers(
             p = (float(r["lon"]), float(r["lat"]))
             if not _in_bbox(p, bbox_ll):
                 continue
-            folium.CircleMarker([p[1], p[0]], color="blue", radius=3).add_to(fgN)
+            folium.CircleMarker([p[1], _lon_viz(p[0], bbox_ll)], color="blue", radius=3).add_to(fgN)
         fgN.add_to(m)
 
-    if isinstance(S_nodes, pd.DataFrame) and S_edges is not None and show_edges:
-        # Normalize edge container to an iterable of 2-endpoints.
-        # Supported:
-        #  - list/tuple of (u,v) where u,v are indices or lonlat
-        #  - DataFrame with columns (u,v) or (a,b)
-        if isinstance(S_edges, pd.DataFrame):
-            if {"u", "v"}.issubset(S_edges.columns):
-                take_iter = S_edges[["u", "v"]].head(int(max_edges)).itertuples(index=False, name=None)
-                total_edges = len(S_edges)
-            elif {"a", "b"}.issubset(S_edges.columns):
-                take_iter = S_edges[["a", "b"]].head(int(max_edges)).itertuples(index=False, name=None)
-                total_edges = len(S_edges)
-            else:
-                take_iter = []
-                total_edges = len(S_edges)
-            take = list(take_iter)
-        else:
-            total_edges = len(S_edges)
-            take = S_edges[:max_edges] if len(S_edges) > int(max_edges) else S_edges
-        fgE = folium.FeatureGroup(name=f"S_edges ({len(take)}/{len(S_edges)})", show=show)
+    if not show_edges:
+        return
+    if not isinstance(S_nodes, pd.DataFrame) or S_edges is None:
+        return
 
-        def sea_ll(i: int) -> LonLat:
-            s = S_nodes.iloc[int(i)]
-            return (float(s["lon"]), float(s["lat"]))
+    # Build a lookup for index->lonlat if S_edges uses indices
+    idx2ll: Dict[int, LonLat] = {}
+    if {"lon", "lat"}.issubset(S_nodes.columns):
+        for i, r in S_nodes.iterrows():
+            try:
+                idx2ll[int(i)] = (float(r["lon"]), float(r["lat"]))
+            except Exception:
+                pass
 
-        def parse_ll(obj) -> Optional[LonLat]:
-            if isinstance(obj, (list, tuple)) and len(obj) >= 2:
-                try:
-                    return (float(obj[0]), float(obj[1]))
-                except Exception:
-                    return None
-            if isinstance(obj, str) and "," in obj:
-                try:
-                    a, b = obj.split(",")
-                    return (float(a), float(b))
-                except Exception:
-                    return None
+    def _resolve(v) -> Optional[LonLat]:
+        if v is None:
             return None
+        # already lonlat-like
+        if isinstance(v, (list, tuple)) and len(v) >= 2:
+            try:
+                return (float(v[0]), float(v[1]))
+            except Exception:
+                return None
+        # index
+        try:
+            iv = int(v)
+        except Exception:
+            return None
+        return idx2ll.get(iv)
 
-        for e in take:
-            if not isinstance(e, (list, tuple)) or len(e) < 2:
-                continue
-            a = b = None
-            u, v = e[0], e[1]
+    # Normalize edge container to an iterable of 2-endpoints.
+    if isinstance(S_edges, pd.DataFrame):
+        if {"u", "v"}.issubset(S_edges.columns):
+            take_iter = S_edges[["u", "v"]].head(int(max_edges)).itertuples(index=False, name=None)
+            total_edges = len(S_edges)
+        elif {"a", "b"}.issubset(S_edges.columns):
+            take_iter = S_edges[["a", "b"]].head(int(max_edges)).itertuples(index=False, name=None)
+            total_edges = len(S_edges)
+        else:
+            take_iter = []
+            total_edges = len(S_edges)
+    else:
+        take_iter = list(S_edges)[: int(max_edges)]
+        total_edges = len(S_edges)
 
-            # case1: integer indices into S_nodes
-            if isinstance(u, (int,)) and isinstance(v, (int,)):
-                try:
-                    a = sea_ll(int(u))
-                    b = sea_ll(int(v))
-                except Exception:
-                    a = b = None
-            else:
-                # case2: endpoints already lon/lat
-                a = parse_ll(u)
-                b = parse_ll(v)
-
-            if a is None or b is None:
-                continue
-            if not (_in_bbox(a, bbox_ll) or _in_bbox(b, bbox_ll)):
-                continue
-            folium.PolyLine([[a[1], a[0]], [b[1], b[0]]], weight=2, opacity=0.8).add_to(fgE)
-        fgE.add_to(m)
-
+    fgE = folium.FeatureGroup(name=f"S_edges ({min(int(max_edges), total_edges)}/{total_edges})", show=False)
+    drawn = 0
+    for uv in take_iter:
+        if not isinstance(uv, (list, tuple)) or len(uv) < 2:
+            continue
+        a = _resolve(uv[0])
+        b = _resolve(uv[1])
+        if a is None or b is None:
+            continue
+        if not (_in_bbox(a, bbox_ll) and _in_bbox(b, bbox_ll)):
+            continue
+        a_v = (_lon_viz(a[0], bbox_ll), a[1])
+        b_v = (_lon_viz(b[0], bbox_ll), b[1])
+        folium.PolyLine([[a_v[1], a_v[0]], [b_v[1], b_v[0]]], weight=2, opacity=0.8, color="#2b8cbe").add_to(fgE)
+        drawn += 1
+    fgE.add_to(m)
 
 def add_ring_layers(
     m: folium.Map,
@@ -263,13 +416,16 @@ def add_ring_layers(
     show: bool = True,
     bbox_ll: Optional[BBoxLL] = None,
 ) -> None:
+    if bbox_ll is None:
+        bbox_ll = getattr(m, "_routing_bbox_ll", None)
+
     rg = out.get("ring_graph", {}) or {}
     E_nodes = rg.get("E_nodes")
     T_nodes = rg.get("T_nodes")
     E_edges = rg.get("E_edges")
     T_edges = rg.get("T_edges")
 
-    def _nodes_layer(df: pd.DataFrame, title: str, sample: Optional[int], radius: int):
+    def _nodes_layer(df: pd.DataFrame, title: str, sample: Optional[int], radius: int, color: str):
         dd = df
         if sample is not None and len(dd) > int(sample):
             dd = dd.sample(int(sample), random_state=7)
@@ -278,46 +434,42 @@ def add_ring_layers(
             p = (float(r.get("lon")), float(r.get("lat")))
             if not _in_bbox(p, bbox_ll):
                 continue
-            folium.CircleMarker([p[1], p[0]], radius=radius).add_to(fg)
+            folium.CircleMarker([p[1], _lon_viz(p[0], bbox_ll)], radius=radius, color=color).add_to(fg)
         fg.add_to(m)
 
-    if show_e and isinstance(E_nodes, pd.DataFrame) and len(E_nodes) > 0:
-        _nodes_layer(E_nodes, "E_nodes", e_node_sample, radius=2)
-
-    if show_t and isinstance(T_nodes, pd.DataFrame) and len(T_nodes) > 0:
-        _nodes_layer(T_nodes, "T_nodes", t_node_sample, radius=3)
-
-    def _edge_layer(edges_df: pd.DataFrame, nodes_df: pd.DataFrame, title: str, max_edges: int):
-        if not isinstance(edges_df, pd.DataFrame) or len(edges_df) == 0:
-            return
-        if not isinstance(nodes_df, pd.DataFrame) or len(nodes_df) == 0:
-            return
-        if "node_id" not in nodes_df.columns:
-            return
-        id2ll = {int(r["node_id"]): (float(r.get("lon")), float(r.get("lat"))) for _, r in nodes_df.iterrows()}
-        take = edges_df.head(int(max_edges))
-        fg = folium.FeatureGroup(name=f"{title} ({len(take)}/{len(edges_df)})", show=show)
+    def _edge_layer(edges: pd.DataFrame, nodes: pd.DataFrame, title: str, max_edges: int, color: str):
+        # node_id -> lonlat
+        nid2ll = {}
+        if "node_id" in nodes.columns:
+            nid2ll = {int(r["node_id"]): (float(r.get("lon")), float(r.get("lat"))) for _, r in nodes.iterrows()}
+        take = edges.head(int(max_edges))
+        fg = folium.FeatureGroup(name=f"{title} ({len(take)}/{len(edges)})", show=False)
         for _, r in take.iterrows():
             try:
                 u = int(r.get("u"))
                 v = int(r.get("v"))
-                a = id2ll.get(u)
-                b = id2ll.get(v)
-                if a is None or b is None:
-                    continue
-                if not (_in_bbox(a, bbox_ll) or _in_bbox(b, bbox_ll)):
-                    continue
-                folium.PolyLine([[a[1], a[0]], [b[1], b[0]]], color="green", weight=2, opacity=0.8).add_to(fg)
             except Exception:
                 continue
+            a = nid2ll.get(u)
+            b = nid2ll.get(v)
+            if a is None or b is None:
+                continue
+            if not (_in_bbox(a, bbox_ll) and _in_bbox(b, bbox_ll)):
+                continue
+            a_v = (_lon_viz(a[0], bbox_ll), a[1])
+            b_v = (_lon_viz(b[0], bbox_ll), b[1])
+            folium.PolyLine([[a_v[1], a_v[0]], [b_v[1], b_v[0]]], weight=2, opacity=0.7, color=color).add_to(fg)
         fg.add_to(m)
 
+    if show_e and isinstance(E_nodes, pd.DataFrame) and len(E_nodes) > 0:
+        _nodes_layer(E_nodes, "E_nodes", e_node_sample, radius=2, color="#3182bd")
+    if show_t and isinstance(T_nodes, pd.DataFrame) and len(T_nodes) > 0:
+        _nodes_layer(T_nodes, "T_nodes", t_node_sample, radius=2, color="#31a354")
+
     if show_e and isinstance(E_edges, pd.DataFrame) and isinstance(E_nodes, pd.DataFrame):
-        _edge_layer(E_edges, E_nodes, "E_edges", max_e_edges)
-
+        _edge_layer(E_edges, E_nodes, "E_edges", max_e_edges, color="#6baed6")
     if show_t and isinstance(T_edges, pd.DataFrame) and isinstance(T_nodes, pd.DataFrame):
-        _edge_layer(T_edges, T_nodes, "T_edges", max_t_edges)
-
+        _edge_layer(T_edges, T_nodes, "T_edges", max_t_edges, color="#74c476")
 
 def add_connector_layers(
     m: folium.Map,
@@ -330,6 +482,9 @@ def add_connector_layers(
     show: bool = True,
     bbox_ll: Optional[BBoxLL] = None,
 ) -> None:
+    if bbox_ll is None:
+        bbox_ll = getattr(m, "_routing_bbox_ll", None)
+
     rg = out.get("ring_graph", {}) or {}
     E_nodes = rg.get("E_nodes")
     T_nodes = rg.get("T_nodes")
@@ -337,61 +492,61 @@ def add_connector_layers(
     dfTG = out.get("tgate_sea_connectors")
     S_nodes = out.get("S_nodes")
 
-    # maps
-    e_map = {}
-    t_map = {}
+    e_map: Dict[int, LonLat] = {}
+    t_map: Dict[int, LonLat] = {}
     if isinstance(E_nodes, pd.DataFrame) and "node_id" in E_nodes.columns:
         e_map = {int(r["node_id"]): (float(r.get("lon")), float(r.get("lat"))) for _, r in E_nodes.iterrows()}
     if isinstance(T_nodes, pd.DataFrame) and "node_id" in T_nodes.columns:
         t_map = {int(r["node_id"]): (float(r.get("lon")), float(r.get("lat"))) for _, r in T_nodes.iterrows()}
 
+    # Sea node index -> lonlat
+    s_map: Dict[int, LonLat] = {}
+    if isinstance(S_nodes, pd.DataFrame) and {"lon", "lat"}.issubset(S_nodes.columns):
+        for i, r in S_nodes.iterrows():
+            try:
+                s_map[int(i)] = (float(r["lon"]), float(r["lat"]))
+            except Exception:
+                pass
+
     if show_et and isinstance(ET, pd.DataFrame) and e_map and t_map:
         take = ET.head(int(max_et))
-        fg = folium.FeatureGroup(name=f"E<->T ({len(take)}/{len(ET)})", show=show)
+        fg = folium.FeatureGroup(name=f"E<->T ({len(take)}/{len(ET)})", show=False)
         for _, r in take.iterrows():
             try:
                 u = int(r.get("u"))
                 v = int(r.get("v"))
             except Exception:
                 continue
-            # By design in e_t_transfer_v2:
-            #   u = e_node_id, v = t_node_id
-            # Using `or` here can explode if node_id ranges overlap between E and T.
             a = e_map.get(u)
             b = t_map.get(v)
             if a is None or b is None:
-                # fallback: tolerate swapped columns in older experiments
-                a = e_map.get(v)
-                b = t_map.get(u)
-            if a is None or b is None:
                 continue
-            if not (_in_bbox(a, bbox_ll) or _in_bbox(b, bbox_ll)):
+            if not (_in_bbox(a, bbox_ll) and _in_bbox(b, bbox_ll)):
                 continue
-            folium.PolyLine([[a[1], a[0]], [b[1], b[0]]], color="orange", weight=2, opacity=0.85).add_to(fg)
+            a_v = (_lon_viz(a[0], bbox_ll), a[1])
+            b_v = (_lon_viz(b[0], bbox_ll), b[1])
+            folium.PolyLine([[a_v[1], a_v[0]], [b_v[1], b_v[0]]], weight=2, opacity=0.85, color="#756bb1").add_to(fg)
         fg.add_to(m)
 
-    if show_tgate_sea and isinstance(dfTG, pd.DataFrame) and isinstance(S_nodes, pd.DataFrame) and t_map:
-        sea_col = "sea_idx" if "sea_idx" in dfTG.columns else ("s_idx" if "s_idx" in dfTG.columns else None)
-        tcol = "t_node_id" if "t_node_id" in dfTG.columns else ("t_id" if "t_id" in dfTG.columns else None)
-        if sea_col and tcol:
-            take = dfTG.head(int(max_tgate))
-            fg = folium.FeatureGroup(name=f"Tgate->Sea ({len(take)}/{len(dfTG)})", show=show)
-            for _, r in take.iterrows():
-                try:
-                    tid = int(r[tcol])
-                    sid = int(r[sea_col])
-                    a = t_map.get(tid)
-                    s = S_nodes.iloc[sid]
-                    b = (float(s["lon"]), float(s["lat"]))
-                except Exception:
-                    continue
-                if a is None:
-                    continue
-                if not (_in_bbox(a, bbox_ll) or _in_bbox(b, bbox_ll)):
-                    continue
-                folium.PolyLine([[a[1], a[0]], [b[1], b[0]]], weight=2, opacity=0.85).add_to(fg)
-            fg.add_to(m)
-
+    if show_tgate_sea and isinstance(dfTG, pd.DataFrame) and len(dfTG) > 0 and t_map and s_map:
+        take = dfTG.head(int(max_tgate))
+        fg = folium.FeatureGroup(name=f"Tgate->Sea ({len(take)}/{len(dfTG)})", show=False)
+        for _, r in take.iterrows():
+            try:
+                t_id = int(r.get("t_node_id"))
+                sea_idx = int(r.get("sea_idx"))
+            except Exception:
+                continue
+            a = t_map.get(t_id)
+            b = s_map.get(sea_idx)
+            if a is None or b is None:
+                continue
+            if not (_in_bbox(a, bbox_ll) and _in_bbox(b, bbox_ll)):
+                continue
+            a_v = (_lon_viz(a[0], bbox_ll), a[1])
+            b_v = (_lon_viz(b[0], bbox_ll), b[1])
+            folium.PolyLine([[a_v[1], a_v[0]], [b_v[1], b_v[0]]], weight=2, opacity=0.85, color="#e6550d").add_to(fg)
+        fg.add_to(m)
 
 def finalize_map(m: folium.Map, *, html_path: str) -> str:
     m.add_child(folium.LayerControl(collapsed=False))

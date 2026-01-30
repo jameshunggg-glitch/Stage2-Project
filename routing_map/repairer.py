@@ -456,8 +456,35 @@ class PathRepairer:
             prepared_collision = collision_m
 
         def _default_edge_ll(u, v, data) -> Tuple[LonLat, LonLat]:
-            # assume node keys are (lon,lat) tuples
-            return (float(u[0]), float(u[1])), (float(v[0]), float(v[1]))
+            # Prefer graph node attrs (node_id edition), fallback to parsing lon/lat from node_id.
+            def _node_ll(n) -> LonLat:
+                try:
+                    if hasattr(G, "nodes") and n in G.nodes:
+                        nd = G.nodes[n]
+                        if isinstance(nd, dict) and "lon" in nd and "lat" in nd:
+                            return (float(nd["lon"]), float(nd["lat"]))
+                except Exception:
+                    pass
+
+                # parse "...lon,lat" from node id
+                s = str(n)
+                if ":" in s:
+                    s2 = s.split(":", 1)[1]
+                else:
+                    s2 = s
+                if "," in s2:
+                    a, b = s2.split(",", 1)
+                    try:
+                        return (float(a), float(b))
+                    except Exception:
+                        pass
+
+                # tuple fallback
+                if isinstance(n, (tuple, list)) and len(n) == 2:
+                    return (float(n[0]), float(n[1]))
+                raise KeyError(f"cannot resolve lon/lat for node {n}")
+
+            return _node_ll(u), _node_ll(v)
 
         def _default_should_repair(u, v, data) -> bool:
             et = str(data.get("etype", ""))
@@ -467,16 +494,15 @@ class PathRepairer:
         edge_should_repair = edge_should_repair or _default_should_repair
 
         # Build repaired lonlat polyline by walking edges
-        repaired_nodes: List[Any] = [path_nodes[0]] if path_nodes else []
+        repaired_nodes: List[Any] = list(path_nodes)
         repaired_ll: List[LonLat] = []
 
         if not path_nodes:
             return RepairOutcome(path_nodes=[], path_ll=[], stats=stats, debug=dbg)
 
-        # seed first point
-        first_ll = (float(path_nodes[0][0]), float(path_nodes[0][1]))
-        repaired_ll.append(first_ll)
-
+        # seed first point (node_id-safe)
+        ll0, _ll0 = edge_ll(path_nodes[0], path_nodes[0], {})
+        repaired_ll.append(ll0)
         for u, v in zip(path_nodes, path_nodes[1:]):
             stats.checked_edges += 1
             data = G[u][v] if hasattr(G, "__getitem__") else {}
@@ -487,9 +513,8 @@ class PathRepairer:
 
             # if not eligible => just append v
             if not edge_should_repair(u, v, data):
-                ll_v = (float(v[0]), float(v[1]))
+                _, ll_v = edge_ll(u, v, data)
                 repaired_ll.append(ll_v)
-                repaired_nodes.append(v)
                 continue
 
             ll_u, ll_v = edge_ll(u, v, data)
@@ -500,7 +525,6 @@ class PathRepairer:
             if not _line_intersects(prepared_collision, seg):
                 # ok
                 repaired_ll.append(ll_v)
-                repaired_nodes.append(v)
                 continue
 
             stats.colliding_edges += 1
@@ -527,7 +551,6 @@ class PathRepairer:
                     # make a lonlat tuple node key (consistent with your notebook)
                     node = (float(llp[0]), float(llp[1]))
                     repaired_ll.append(node)
-                    repaired_nodes.append(node)
                 dbg.append(rec)
                 continue
 
@@ -543,7 +566,6 @@ class PathRepairer:
                     llp = m2ll((p_xy[0], p_xy[1]))
                     node = (float(llp[0]), float(llp[1]))
                     repaired_ll.append(node)
-                    repaired_nodes.append(node)
                 dbg.append(rec)
                 continue
 
@@ -554,6 +576,5 @@ class PathRepairer:
 
             # fall back to original v (even though colliding) so path stays continuous
             repaired_ll.append(ll_v)
-            repaired_nodes.append(v)
 
         return RepairOutcome(path_nodes=repaired_nodes, path_ll=repaired_ll, stats=stats, debug=dbg)

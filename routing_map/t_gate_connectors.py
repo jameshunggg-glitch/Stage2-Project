@@ -335,7 +335,9 @@ def build_tgate_sea_connectors(
                     "etype": params.etype,
                     "ring_id": rid,
                     "t_node_id": tid,
+                    "t_node_key": f"T:{int(tid)}",
                     "sea_idx": int(si),
+                    "sea_node_id": str(S_nodes.loc[int(si), "node_id"]) if isinstance(S_nodes, pd.DataFrame) and "node_id" in S_nodes.columns and int(si) in S_nodes.index else "",
                     "dist_km": float(dist_km),
                     "reason": reason,
                     "sector_ok": bool(sector_ok),
@@ -366,8 +368,10 @@ def add_tgate_sea_connectors_to_graph(
     - sea_node_key_fn: maps sea_idx  -> graph node key (default: identity)
     """
     if t_node_key_fn is None:
-        t_node_key_fn = lambda tid: int(tid)
+        # default to node-id scheme
+        t_node_key_fn = lambda tid: f"T:{int(tid)}"
     if sea_node_key_fn is None:
+        # WARNING: without sea_node_id column, caller must provide a mapper.
         sea_node_key_fn = lambda sid: int(sid)
 
     if not isinstance(df_conn, pd.DataFrame) or len(df_conn) == 0:
@@ -380,8 +384,8 @@ def add_tgate_sea_connectors_to_graph(
         w = float(getattr(r, weight_col))
         et = str(getattr(r, etype_col)) if hasattr(r, etype_col) else "T_S_GATE"
 
-        u = t_node_key_fn(tid)
-        v = sea_node_key_fn(sid)
+        u = str(getattr(r, "t_node_key")) if hasattr(r, "t_node_key") and getattr(r, "t_node_key") else t_node_key_fn(tid)
+        v = str(getattr(r, "sea_node_id")) if hasattr(r, "sea_node_id") and getattr(r, "sea_node_id") else sea_node_key_fn(sid)
 
         # Add nodes if missing (no attributes here; caller can add node attrs elsewhere)
         if u not in G:

@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Dict, Any
 
 import numpy as np
+import pandas as pd
 from shapely.prepared import prep
 
 from .config import RoutingMapConfig
@@ -142,18 +143,21 @@ def build_aoi(cfg: RoutingMapConfig) -> Dict[str, Any]:
     """
     # --- AOI bbox ---
     bbox_ll = cfg.aoi.bbox_ll
+    #print("[land] bbox ll before =", bbox_ll)
     if bbox_ll is None:
         if cfg.aoi.origin_ll is None or cfg.aoi.dest_ll is None:
             raise ValueError("Provide either aoi.bbox_ll or (aoi.origin_ll & aoi.dest_ll)")
         bbox_ll = make_aoi_bbox(cfg.aoi.origin_ll, cfg.aoi.dest_ll, cfg.aoi.pad_deg)
     
     bbox_ll = _norm_bbox_ll(bbox_ll)
+    #print("[land] bbox ll after =", bbox_ll)
 
 
     proj = build_projector_from_bbox(bbox_ll)
 
     # --- Land ---
     polys_ll = load_polys_in_bbox(cfg.land.shp_path, bbox_ll)
+    print("[land] polys count =", len(polys_ll))
     layers = build_land_layers(
         polys_ll, proj,
         buffer_km=cfg.land.buffer_km,
@@ -236,12 +240,27 @@ def build_aoi(cfg: RoutingMapConfig) -> Dict[str, Any]:
             ring_len = {}
             # 你 v1 產物 rings 物件我不確定結構，所以做 best-effort
             # 若 rings 是 list[LineString] 且和 rings_df 對齊：
-            if isinstance(rings, (list, tuple)) and len(rings) == len(rings_df):
+            if isinstance(rings_df, pd.DataFrame):
+                if "ring_id" not in rings_df.columns:
+                    if "id" in rings_df.columns:
+                        rings_df = rings_df.rename(columns={"id": "ring_id"})
+                    elif "rid" in rings_df.columns:
+                        rings_df = rings_df.rename(columns={"rid": "ring_id"})
+                    else:
+                        rings_df["ring_id"] = np.arange(len(rings_df), dtype=int)
+            if isinstance(rings, (list, tuple)) and isinstance(rings_df, pd.DataFrame) and len(rings) == len(rings_df):
                 for rid, ls in zip(rings_df["ring_id"].tolist(), rings):
                     if hasattr(ls, "coords"):
                         ring_len[int(rid)] = _line_len_km(ls)
-            rings_df["length_km"] = rings_df["ring_id"].map(lambda rid: ring_len.get(int(rid), np.nan))
-            rings_df["length_km"] = rings_df["length_km"].fillna(0.0)
+
+                for rid, ls in zip(rings_df["ring_id"].tolist(), rings):
+                    if hasattr(ls, "coords"):
+                        ring_len[int(rid)] = _line_len_km(ls)
+            if isinstance(rings_df, pd.DataFrame) and "ring_id" in rings_df.columns:
+                rings_df["length_km"] = rings_df["ring_id"].map(lambda rid: ring_len.get(int(rid), np.nan))
+                rings_df["length_km"] = rings_df["length_km"].fillna(0.0)
+
+            
     
     et_cfg = ETRampConfig(
         ramp_spacing_km=60.0,
@@ -400,9 +419,41 @@ def build_aoi(cfg: RoutingMapConfig) -> Dict[str, Any]:
             keep_row = sorted(set(gateB_connectors["gate_row"].astype(int).tolist()))
             Gate_B_kept_gates = Gate_all_cov.iloc[keep_row].reset_index(drop=True)
 
+
+    # -------------------------
+    # node_id mappings (for pipeline / heuristic / viz)
+    # -------------------------
+    id2ll: Dict[str, Tuple[float, float]] = {}
+    id2xy: Dict[str, Tuple[float, float]] = {}
+
+    # Sea nodes (S:lon,lat)
+    if isinstance(S_nodes, pd.DataFrame) and len(S_nodes) and "node_id" in S_nodes.columns:
+        for r in S_nodes.itertuples(index=False):
+            nid = str(getattr(r, "node_id"))
+            id2ll[nid] = (float(getattr(r, "lon")), float(getattr(r, "lat")))
+            if hasattr(r, "x_m") and hasattr(r, "y_m"):
+                id2xy[nid] = (float(getattr(r, "x_m")), float(getattr(r, "y_m")))
+
+    # Ring nodes (E:/T:)
+    if isinstance(ring_graph, dict):
+        for _k, _prefix in [("E_nodes", "E"), ("T_nodes", "T")]:
+            df = ring_graph.get(_k)
+            if isinstance(df, pd.DataFrame) and len(df):
+                if "node_key" not in df.columns and "node_id" in df.columns:
+                    df = df.copy()
+                    df["node_key"] = df["node_id"].map(lambda i: f"{_prefix}:{int(i)}")
+                for r in df.itertuples(index=False):
+                    nid = str(getattr(r, "node_key"))
+                    id2ll[nid] = (float(getattr(r, "lon")), float(getattr(r, "lat")))
+                    if hasattr(r, "x_m") and hasattr(r, "y_m"):
+                        id2xy[nid] = (float(getattr(r, "x_m")), float(getattr(r, "y_m")))
+
+
     return {
         "cfg": cfg,
         "bbox_ll": bbox_ll,
+        "id2ll": id2ll,
+        "id2xy": id2xy,
         "bbox_ll_sea": bbox_ll_sea,
         "bbox_ll_sea_parts": sea_bboxes,
         "proj": proj,

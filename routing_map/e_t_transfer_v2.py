@@ -326,6 +326,12 @@ def build_e_t_transfer_edges(
     else:
         ET_edges = ET_edges_ramp.copy()
 
+    
+    # --- Global graph string keys (keep int ids for internal computations)
+    for _df in [ET_edges_shared, ET_edges_ramp]:
+        if isinstance(_df, pd.DataFrame) and len(_df) and "u" in _df.columns and "v" in _df.columns:
+            _df["u_key"] = _df["u"].map(lambda i: f"E:{int(i)}")
+            _df["v_key"] = _df["v"].map(lambda i: f"T:{int(i)}")
     return {
         "ET_edges": ET_edges,
         "ET_edges_shared": ET_edges_shared,

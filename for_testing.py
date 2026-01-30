@@ -1,894 +1,611 @@
-import folium, webbrowser
-from pathlib import Path
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
+
+import math
 import numpy as np
 import pandas as pd
-import networkx as nx
-from collections import Counter
 
-from shapely.geometry import LineString, box
-from shapely.ops import transform as shp_transform
-
-# === modules ===
-from routing_map.path_simplifier import simplify_path_visibility
-from routing_map.routing_graph import build_base_graph, haversine_km
-from routing_map.c_gateb_connectors import (
-    build_cnode_gateb_connectors_nearest,
-    add_cnode_gateb_connectors_to_graph,
-)
-from routing_map.snap import snap_pair_component_aware, inject_point_edges
-from routing_map.repairer import PathRepairer, RepairConfig
-
-#  snap-link repair helper (you said it's already ready)
-from routing_map.snap_link_repair import repair_snap_link_ll_if_needed
-
-from routing_map.metrics import path_length_km_nm, format_distance
-from routing_map.snap_link_repair import repair_snap_link_ll_if_needed
+from .ring_types import RingBuildConfig, RingResult, XY
 
 
-
-# ---------------------------
-# helpers
-# ---------------------------
-def in_bbox(p, bbox_ll):
-    if bbox_ll is None:
-        return True
-    min_lon, min_lat, max_lon, max_lat = map(float, bbox_ll)
-    lon, lat = float(p[0]), float(p[1])
-    return (min_lon <= lon <= max_lon) and (min_lat <= lat <= max_lat)
-
-def safe_df(out, name):
-    df = out.get(name, None)
-    if df is None:
-        return None
-    try:
-        return df if len(df) > 0 else None
-    except Exception:
+# -----------------------------
+# Projector helpers (robust)
+# -----------------------------
+def _get_proj_fn(proj: Any, name: str) -> Optional[Callable]:
+    """
+    Robust projector function getter.
+    Expected names: "ll2m", "m2ll".
+    Also supports legacy transformer names: to_m/to_ll (Transformer.transform).
+    """
+    if proj is None:
         return None
 
-def build_gate_xy(out):
-    gate_df = safe_df(out, "Gate_all_cov")
-    if gate_df is None:
-        gate_df = safe_df(out, "Gate_all")
-    if gate_df is None or "g_id" not in gate_df.columns:
-        return {}
-    return {int(r["g_id"]): (float(r["lon"]), float(r["lat"])) for _, r in gate_df.iterrows()}
-
-def get_gateB_df(out, gate_xy):
-    gb_obj = out.get("Gate_B_kept_gates", None)
-    dfGB = None
-
-    if isinstance(gb_obj, pd.DataFrame):
-        dfGB = gb_obj.copy()
-        if "lon" not in dfGB.columns or "lat" not in dfGB.columns:
-            if "g_id" in dfGB.columns and gate_xy:
-                dfGB["lon"] = dfGB["g_id"].map(lambda x: gate_xy.get(int(x), (np.nan, np.nan))[0])
-                dfGB["lat"] = dfGB["g_id"].map(lambda x: gate_xy.get(int(x), (np.nan, np.nan))[1])
-        dfGB = dfGB.dropna(subset=["lon", "lat"])
-
-    elif isinstance(gb_obj, (list, set, tuple, np.ndarray)):
-        gids = [int(x) for x in gb_obj]
-        rows = []
-        for gid in gids:
-            if gid in gate_xy:
-                lon, lat = gate_xy[gid]
-                rows.append({"g_id": gid, "lon": lon, "lat": lat})
-        dfGB = pd.DataFrame(rows)
-
-    if dfGB is None:
-        gb2 = safe_df(out, "Gate_B")
-        if gb2 is not None:
-            dfGB = gb2.copy()
-
-    return dfGB if (dfGB is not None and len(dfGB) > 0) else None
-
-def parse_node_id_str(s):
-    try:
-        a, b = s.split(",")
-        return float(a), float(b)
-    except Exception:
+    # dict-like
+    if isinstance(proj, dict):
+        # preferred
+        if name in proj and callable(proj[name]):
+            return proj[name]
+        # legacy transformers
+        if name == "m2ll" and "to_ll" in proj and hasattr(proj["to_ll"], "transform"):
+            return proj["to_ll"].transform
+        if name == "ll2m" and "to_m" in proj and hasattr(proj["to_m"], "transform"):
+            return proj["to_m"].transform
         return None
 
-def edge_to_lonlat(e, *, nodes_df=None, idx_to_lonlat_fn=None):
-    if not isinstance(e, (list, tuple)) or len(e) < 2:
-        return None
-    a, b = e[0], e[1]
+    # object-like (AOIProjector)
+    if hasattr(proj, name) and callable(getattr(proj, name)):
+        return getattr(proj, name)
 
-    if isinstance(a, (int, np.integer)) and isinstance(b, (int, np.integer)):
-        if nodes_df is None or idx_to_lonlat_fn is None:
-            return None
-        try:
-            return (idx_to_lonlat_fn(a), idx_to_lonlat_fn(b))
-        except Exception:
-            return None
-
-    if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)) and len(a) >= 2 and len(b) >= 2:
-        try:
-            return ((float(a[0]), float(a[1])), (float(b[0]), float(b[1])))
-        except Exception:
-            return None
-
-    if isinstance(a, str) and isinstance(b, str):
-        p1 = parse_node_id_str(a)
-        p2 = parse_node_id_str(b)
-        if p1 and p2:
-            return (p1, p2)
+    # legacy: transformers on object
+    if name == "m2ll" and hasattr(proj, "to_ll") and hasattr(proj.to_ll, "transform"):
+        return proj.to_ll.transform
+    if name == "ll2m" and hasattr(proj, "to_m") and hasattr(proj.to_m, "transform"):
+        return proj.to_m.transform
 
     return None
 
-def unwrap_lon(lon, ref_lon):
-    lon = float(lon); ref_lon = float(ref_lon)
-    d = lon - ref_lon
-    if d > 180: lon -= 360
-    if d < -180: lon += 360
-    return lon
 
-def route_polyline_dateline_safe(path_ll):
-    if not path_ll:
+
+def _m2ll_safe(proj: Any, x: float, y: float) -> Tuple[float, float]:
+    fn = _get_proj_fn(proj, "m2ll")
+    if fn is None:
+        return (float("nan"), float("nan"))
+    try:
+        # try signature fn(x,y) first (AOIProjector.m2ll, Transformer.transform both work)
+        lon, lat = fn(float(x), float(y))
+        return (float(lon), float(lat))
+    except TypeError:
+        try:
+            # alternate signature fn((x,y))
+            lon, lat = fn((float(x), float(y)))
+            return (float(lon), float(lat))
+        except Exception:
+            return (float("nan"), float("nan"))
+    except Exception:
+        return (float("nan"), float("nan"))
+
+
+
+
+# -----------------------------
+# Geometry helpers (metric)
+# -----------------------------
+def _dist_m(a: XY, b: XY) -> float:
+    return float(math.hypot(b[0] - a[0], b[1] - a[1]))
+
+
+def _cum_s_km_closed(pts: List[XY]) -> List[float]:
+    """
+    For a closed ring represented by UNIQUE vertices (NOT duplicated last),
+    compute cumulative distance s_km per vertex (starting at 0).
+    """
+    n = len(pts)
+    if n == 0:
         return []
-    out = []
-    ref = float(path_ll[0][0])
-    for lon, lat in path_ll:
-        lon_u = unwrap_lon(lon, ref)
-        out.append((lon_u, float(lat)))
-        ref = lon_u
+    s = [0.0]
+    acc = 0.0
+    for i in range(1, n):
+        acc += _dist_m(pts[i-1], pts[i]) / 1000.0
+        s.append(acc)
+    return s
+
+
+def _turn_angle_deg(prev: XY, cur: XY, nxt: XY) -> float:
+    """
+    Signed turning angle at 'cur' when walking prev->cur->nxt.
+    Returns degrees in [-180, 180]. We often use abs(angle).
+    """
+    ax, ay = cur[0] - prev[0], cur[1] - prev[1]
+    bx, by = nxt[0] - cur[0], nxt[1] - cur[1]
+    # protect zero-length
+    an = math.hypot(ax, ay)
+    bn = math.hypot(bx, by)
+    if an < 1e-9 or bn < 1e-9:
+        return 0.0
+    ax, ay = ax / an, ay / an
+    bx, by = bx / bn, by / bn
+    dot = max(-1.0, min(1.0, ax * bx + ay * by))
+    cross = ax * by - ay * bx
+    ang = math.degrees(math.atan2(cross, dot))
+    return float(ang)
+
+
+def _unique_closed_pts(pts_m_closed: List[XY]) -> List[XY]:
+    """
+    Convert possibly-closed (last==first) list into UNIQUE vertices (no duplicate last).
+    """
+    if not pts_m_closed:
+        return []
+    pts = [(float(x), float(y)) for x, y in pts_m_closed]
+    if len(pts) >= 2 and pts[0] == pts[-1]:
+        pts = pts[:-1]
+    return pts
+
+
+def _densify_segment(a: XY, b: XY, max_gap_km: float) -> List[XY]:
+    """
+    Return interior points (excluding endpoints) so that resulting gaps <= max_gap_km.
+    """
+    max_gap_m = float(max_gap_km) * 1000.0
+    d = _dist_m(a, b)
+    if d <= max_gap_m or max_gap_m <= 0:
+        return []
+    k = int(math.ceil(d / max_gap_m))  # number of segments
+    # need k segments => add (k-1) interior points
+    out: List[XY] = []
+    for i in range(1, k):
+        t = i / k
+        out.append((a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t))
     return out
 
+# -----------------------------
+# T node angle degs
+# -----------------------------
 
-# --- projection utilities (USE out["proj"] to match layers CRS) ---
-def _make_ll_m_projectors_from_out(out):
-    """從 out['proj'] 建立經緯度 <-> 公尺 (XY) 的轉換函數"""
-    proj = out.get("proj", None)
-    if proj is None:
-        raise ValueError("out['proj'] not found.")
-
-    def _apply(fn, a, b):
-        if hasattr(fn, "transform") and callable(getattr(fn, "transform")):
-            return fn.transform(a, b)
-        if callable(fn):
-            return fn(a, b) if hasattr(fn, "__call__") else fn((a, b))
-        raise TypeError(f"Projector {type(fn)} invalid")
-
-    candidates = [("ll_to_xy", "xy_to_ll"), ("ll_to_m", "m_to_ll"), ("to_m", "to_ll"), ("fwd", "inv")]
-    for a, b in candidates:
-        if hasattr(proj, a) and hasattr(proj, b):
-            # debug msg
-            print(f"\n[PROJECTOR] Using methods: {a} / {b}")
-            # debug msg
-            f, g = getattr(proj, a), getattr(proj, b)
-            # ------------------------------------------
-            print(f"[PROJECTOR] Type of f: {type(f)}")
-            print(f"[PROJECTOR] f = {f}")
-            try:
-                if hasattr(f, "transform"):
-                    test_result = f.transform(119.7734, 4.7502)
-                else:
-                    test_result = f(119.7734, 4.7502)
-                print(f"[PROJECTOR] Direct call result = {test_result}")
-            except Exception as e:
-                print(f"[PROJECTOR] Direct call failed: {e}")
-            # ------------------------------------------
-            ll2m_xy = lambda lon, lat: tuple(map(float, _apply(f, float(lon), float(lat))))
-            m2ll_xy = lambda x, y: tuple(map(float, _apply(g, float(x), float(y))))
-            return ll2m_xy, m2ll_xy, lambda p: ll2m_xy(p[0], p[1]), lambda q: m2ll_xy(q[0], q[1])
-
-    raise ValueError("Cannot infer projection methods.")
-
-
-def _get_collision_metric(out):
-    layers = out.get("layers", None)
-    if isinstance(layers, dict) and layers.get("COLLISION_M") is not None:
-        return layers["COLLISION_M"]
-
-    c = out.get("COLLISION_M", None)
-    if c is None:
-        c = out.get("collision_m", None)
-    if c is not None:
-        return c
-
-    cp = out.get("collision_prep", None)
-    if cp is not None and hasattr(cp, "context") and cp.context is not None:
-        return cp.context
-
-    return out.get("collision", None)
-
-
-from shapely.geometry import box
-import numpy as np
-from shapely.geometry import box
-
-def _get_densified_metric_box(bbox_ll, ll2m_xy, step_deg=2.0, pad_m=50_000.0):
+def add_t_turn_angles(T_nodes: pd.DataFrame) -> pd.DataFrame:
     """
-    沿著 AOI 的四個邊界進行密集取樣，然後找出 Metric 空間中真正的 min/max xy。
-    解決大範圍投影造成的「弧線切除」問題。
+    Add/overwrite T_nodes['t_angle_deg'] using metric xy and seq order (cycle-aware).
     """
-    min_lon, min_lat, max_lon, max_lat = map(float, bbox_ll)
-    
-    xs, ys = [], []
-    
-    # 建立經度與緯度的取樣點
-    lons = np.arange(min_lon, max_lon + step_deg, step_deg)
-    if lons[-1] != max_lon: lons = np.append(lons, max_lon)
-    
-    lats = np.arange(min_lat, max_lat + step_deg, step_deg)
-    if lats[-1] != max_lat: lats = np.append(lats, max_lat)
-    
-    # 定義要檢查的邊界點 (上緣、下緣、左緣、右緣)
-    # 1. Top & Bottom edges (沿著經度走)
-    for lon in lons:
-        # Bottom edge
-        x, y = ll2m_xy(lon, min_lat)
-        xs.append(x); ys.append(y)
-        # Top edge
-        x, y = ll2m_xy(lon, max_lat)
-        xs.append(x); ys.append(y)
-        
-    # 2. Left & Right edges (沿著緯度走)
-    for lat in lats:
-        # Left edge
-        x, y = ll2m_xy(min_lon, lat)
-        xs.append(x); ys.append(y)
-        # Right edge
-        x, y = ll2m_xy(max_lon, lat)
-        xs.append(x); ys.append(y)
-        
-    # 找出真正的 Metric 邊界
-    min_x, max_x = min(xs), max(xs)
-    min_y, max_y = min(ys), max(ys)
-    
-    # 加上 Padding 並回傳 Metric Box
-    return box(min_x, min_y, max_x, max_y).buffer(pad_m)
+    if T_nodes is None or len(T_nodes) == 0:
+        return T_nodes
 
-def _clip_collision_to_aoi_bbox(collision_m, bbox_ll, ll2m_xy, pad_m=80_000.0):
-    """
-    Clip metric collision to AOI bbox (also in metric), robust to nonlinear/local projections:
-    - Project ALL 4 bbox corners and take min/max in metric space.
-    - Then build a metric box (+ optional pad) and intersect.
+    T_nodes = T_nodes.copy()
+    if "t_angle_deg" not in T_nodes.columns:
+        T_nodes["t_angle_deg"] = 0.0
 
-    NOTE:
-      bbox_ll is (min_lon, min_lat, max_lon, max_lat) in lon/lat degrees.
-    """
-    if collision_m is None or bbox_ll is None:
-        return collision_m
+    for rid, df_ring in T_nodes.groupby("ring_id", sort=False):
+        df_ring = df_ring.sort_values("seq")
+        idx = df_ring.index.to_list()
+        pts = list(zip(df_ring["x_m"].astype(float).values, df_ring["y_m"].astype(float).values))
+        n = len(pts)
+        if n < 3:
+            T_nodes.loc[idx, "t_angle_deg"] = 0.0
+            continue
 
-    min_lon, min_lat, max_lon, max_lat = map(float, bbox_ll)
+        angs = []
+        for i in range(n):
+            prev = pts[(i - 1) % n]
+            cur  = pts[i]
+            nxt  = pts[(i + 1) % n]
+            angs.append(_turn_angle_deg(prev, cur, nxt))
 
-    # If bbox crosses dateline in [-180,180] convention (rare in your current AOI),
-    # you can either skip clip or handle split-box. For now, handle the simple case only.
-    # (Your current bbox (10..150) doesn't cross, so this won't trigger.)
-    if min_lon > max_lon:
-        # conservative fallback: don't clip (avoid generating a wrong box)
-        # You can implement split-box clipping later if you ever need dateline AOI.
-        print("[collision] bbox crosses dateline; skip clip to avoid wrong AOI box")
-        return collision_m
+        T_nodes.loc[idx, "t_angle_deg"] = np.array(angs, dtype=float)
 
-    # --- Project 4 corners (IMPORTANT) ---
-    corners_ll = [
-        (min_lon, min_lat),
-        (min_lon, max_lat),
-        (max_lon, min_lat),
-        (max_lon, max_lat),
-    ]
+    return T_nodes
 
-    xs, ys = [], []
-    for lon, lat in corners_ll:
-        try:
-            x, y = ll2m_xy(lon, lat)
-        except Exception as e:
-            print("[collision] clip: ll2m failed on corner", (lon, lat), "-> keep original:", repr(e))
-            return collision_m
-        xs.append(float(x))
-        ys.append(float(y))
-
-    minx, maxx = min(xs), max(xs)
-    miny, maxy = min(ys), max(ys)
-
-    # Build AOI metric window (+ pad)
-    #aoi_box_m = box(minx, miny, maxx, maxy).buffer(float(pad_m))
-    aoi_box_m = _get_densified_metric_box(bbox_ll, ll2m_xy, step_deg=2.0, pad_m=pad_m)
-
-    try:
-        c2 = collision_m.intersection(aoi_box_m)
-        if c2 is None or c2.is_empty:
-            print("[collision] clip empty -> keep original")
-            return collision_m
-        
-        return c2
-    except Exception as e:
-        print("[collision] clip failed -> keep original:", repr(e))
-        return collision_m
+# -----------------------------
+# T gate candidate selection
+# -----------------------------
+def _circular_dist_km(s1: float, s2: float, L: float) -> float:
+    """Distance along a closed ring between two arc-length positions s1,s2."""
+    d = abs(float(s1) - float(s2))
+    return float(min(d, max(0.0, L - d))) if L > 0 else float(d)
 
 
+def _ring_length_km_from_s(s_km: np.ndarray) -> float:
+    if len(s_km) == 0:
+        return 0.0
+    return float(np.nanmax(s_km))
 
 
-def _geom_m_to_ll(geom_m, m2ll_xy):
-    def _norm_lon(lon):
-        lon = float(lon)
-        # normalize to [-180, 180]
-        while lon > 180.0:
-            lon -= 360.0
-        while lon < -180.0:
-            lon += 360.0
-        return lon
-
-    def _xy_to_lonlat(x, y, z=None):
-        a, b = m2ll_xy(float(x), float(y))
-
-        a = float(a); b = float(b)
-
-        # --- Auto-fix axis order if inverse returns (lat, lon) ---
-        # Heuristic: lat must be [-90,90], lon must be [-180,180] (or 0..360 before norm)
-        if abs(a) <= 90.0 and abs(b) <= 360.0 and abs(b) > 90.0:
-            # looks like (lat, lon)
-            lat, lon = a, b
-        else:
-            # assume (lon, lat)
-            lon, lat = a, b
-
-        lon = _norm_lon(lon)
-        lat = max(-90.0, min(90.0, float(lat)))  # clamp safety
-        return (lon, lat)
-
-    return shp_transform(_xy_to_lonlat, geom_m)
-
-
-
-# ---------------------------
-# main
-# ---------------------------
-def open_routing_debug_map_p2p(
-    out,
-    origin_ll,
-    dest_ll,
+def _pick_nearest_by_s(
+    candidates: pd.DataFrame,
+    target_s: float,
+    selected_s: List[float],
     *,
-    html_path="aoi_p2p_map.html",
-    zoom_start=5,
-
-    c_sample=8000,
-    s_sample=3000,
-    max_sea_edges_viz=6000,
-
-    include_sea=True,
-    include_cc=True,
-    include_gateb_sea=True,
-
-    use_c_gateb_bridge=True,
-    c_to_gateB_max_deg_dist=None,
-
-    k_near=30,
-    r_max_km_snap=150.0,
-    k_inject=4,
-
-    do_repair=True,
-    do_simplify=True,
-):
-    bbox_ll = out.get("bbox_ll", None)
-    if bbox_ll is None:
-        raise ValueError("out['bbox_ll'] is required.")
-    min_lon, min_lat, max_lon, max_lat = map(float, bbox_ll)
-    center = [(min_lat + max_lat) / 2, (min_lon + max_lon) / 2]
-
-    origin_ll = (float(origin_ll[0]), float(origin_ll[1]))
-    dest_ll   = (float(dest_ll[0]), float(dest_ll[1]))
-
-    C_nodes = safe_df(out, "C_nodes")
-    S_nodes = safe_df(out, "S_nodes")
-    S_edges = out.get("S_edges", None)
-    C_edges_df = safe_df(out, "C_edges")
-
-    gate_xy = build_gate_xy(out)
-    dfGB = get_gateB_df(out, gate_xy)
-    dfGB_conn = safe_df(out, "gateB_connectors")
-
-    # --- build base graph ---
-    G, stats = build_base_graph(
-        out,
-        include_sea=bool(include_sea),
-        include_cc=bool(include_cc),
-        include_gateb_sea=bool(include_gateb_sea),
-        include_c_gateb=False,
-        bbox_ll=bbox_ll,
-        weight_unit="km",
-    )
-    print("[graph] base stats:", stats)
-
-    # --- optional C↔GateB bridge ---
-    cgb_df = None
-    if use_c_gateb_bridge and isinstance(C_nodes, pd.DataFrame) and isinstance(dfGB, pd.DataFrame):
-        cgb_df = build_cnode_gateb_connectors_nearest(
-            C_nodes,
-            dfGB[["g_id", "lon", "lat"]],
-            bbox_ll=bbox_ll,
-            max_deg_dist=c_to_gateB_max_deg_dist,
-        )
-        added = add_cnode_gateb_connectors_to_graph(G, cgb_df, etype="c_gb", weight_col="dist_deg")
-        print(f"[graph] C↔GateB bridge edges added: {added}")
-
-    # --- snap pair ---
-    pair = snap_pair_component_aware(
-        out,
-        origin_ll, dest_ll,
-        k_near=int(k_near),
-        r_max_km=float(r_max_km_snap),
-        k_inject=int(k_inject),
-        prefer_ok_set=True,
-        allow_fallback_non_ok=True,
-        allow_radius_fallback=True,
-        do_nudge=True,
-    )
-
-    start_key = getattr(pair.start, "p_used_ll", origin_ll)
-    end_key   = getattr(pair.end,   "p_used_ll", dest_ll)
-    start_key = (float(start_key[0]), float(start_key[1]))
-    end_key   = (float(end_key[0]), float(end_key[1]))
-
-    path = None
-    path_ll_for_simplify = None
-    path_simplified, simp_stats = None, None
-    collision_used = None
-    ll2m_xy, m2ll_xy = None, None
-
-    #  store inject-edge polylines (these are the "temporary point" links you care about)
-    inject_start_ll = None   # path[0] -> path[1] (repaired if start_inject)
-    inject_end_ll   = None   # path[-2] -> path[-1] (repaired if end_inject)
-
-    if len(pair.start_pick) == 0 or len(pair.end_pick) == 0:
-        print("[snap] FAIL:", pair.reason, pair.debug)
-    else:
-        inject_point_edges(G, start_key, pair.start_pick, k_inject=int(k_inject), etype="start_inject")
-        inject_point_edges(G, end_key,   pair.end_pick,   k_inject=int(k_inject), etype="end_inject")
-        print("[snap] OK:", pair.reason, pair.debug)
-        print("[snap][start] local_entrance_aug:", pair.start.debug.get("local_entrance_aug"))
-        print("[snap][end  ] local_entrance_aug:", pair.end.debug.get("local_entrance_aug"))
+    L: float,
+    min_sep_km: float,
+) -> Optional[int]:
+    """Pick candidate node_id nearest to target_s, respecting min separation to selected."""
+    if candidates.empty:
+        return None
+    s_vals = candidates["s_km"].astype(float).values
+    d_raw = np.abs(s_vals - float(target_s))
+    d_to_target = np.minimum(d_raw, np.maximum(0.0, float(L) - d_raw))
+    order = np.argsort(d_to_target)
+    for idx in order:
+        nid = int(candidates.iloc[int(idx)]["node_id"])
+        s = float(candidates.iloc[int(idx)]["s_km"])
+        if all(_circular_dist_km(s, ss, L) >= float(min_sep_km) for ss in selected_s):
+            return nid
+    return None
 
 
-        # --- A* ---
-        try:
-            path = nx.astar_path(
-                G,
-                start_key,
-                end_key,
-                heuristic=lambda n1, n2: haversine_km(n1, n2),
-                weight="weight",
-            )
-            etypes = [G[u][v].get("etype") for u, v in zip(path, path[1:])]
-            print("[route] OK | points=", len(path), "| etypes=", dict(Counter(etypes)))
-        except Exception as e:
-            path = None
-            print("[route] FAIL:", repr(e))
+def _pick_farthest_point(
+    candidates: pd.DataFrame,
+    selected_s: List[float],
+    *,
+    L: float,
+) -> Optional[int]:
+    """Pick candidate maximizing its minimum distance to selected points."""
+    if candidates.empty:
+        return None
+    if not selected_s:
+        # choose one near s=0 for determinism
+        i0 = int(np.nanargmin(candidates["s_km"].astype(float).values))
+        return int(candidates.iloc[i0]["node_id"])
+    best_nid = None
+    best_score = -1.0
+    for r in candidates.itertuples(index=False):
+        s = float(getattr(r, "s_km"))
+        mind = min(_circular_dist_km(s, ss, L) for ss in selected_s)
+        if mind > best_score:
+            best_score = mind
+            best_nid = int(getattr(r, "node_id"))
+    return best_nid
 
-        # --- repair + simplify ---
-        if path is None or len(path) < 2:
-            print("[repair/simplify] skip: no valid path")
+
+def select_t_gate_candidates(
+    E_nodes: pd.DataFrame,
+    T_nodes: pd.DataFrame,
+    Shared_nodes: pd.DataFrame,
+    *,
+    params: RingGraphBuildParams,
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Mark T_nodes['is_gate_candidate']=True following selection v1.
+
+    Tier-0 (hard): shared nodes whose corresponding E-node abs(angle_deg) >= t_gate_ang_shared_deg
+    Tier-1 (soft): add more along ring by spacing (prefer vertex), respecting min sep
+    Tier-2 (fallback): ensure at least t_gate_min_per_ring per ring by farthest-point picks
+    Soft cap: keep all hard gates, downsample soft ones if above t_gate_max_per_ring
+
+    Returns: (updated T_nodes, T_gate_candidates df)
+    """
+    if T_nodes is None or len(T_nodes) == 0:
+        T_nodes = (T_nodes.copy() if T_nodes is not None else pd.DataFrame())
+        if "is_gate_candidate" not in T_nodes.columns:
+            T_nodes["is_gate_candidate"] = False
+        if "gate_reason" not in T_nodes.columns:
+            T_nodes["gate_reason"] = ""
+        return T_nodes, T_nodes.iloc[0:0].copy()
+
+    T_nodes = T_nodes.copy()
+    if "is_gate_candidate" not in T_nodes.columns:
+        T_nodes["is_gate_candidate"] = False
+    if "gate_reason" not in T_nodes.columns:
+        T_nodes["gate_reason"] = ""
+
+    # map e_node_id -> abs(angle_deg)
+    e_ang: Dict[int, float] = {}
+    if E_nodes is not None and len(E_nodes) > 0 and "angle_deg" in E_nodes.columns:
+        for r in E_nodes.itertuples(index=False):
+            e_ang[int(getattr(r, "node_id"))] = abs(float(getattr(r, "angle_deg")))
+
+    # shared mapping per ring: t_node_id -> e_angle
+    hard_by_ring: Dict[int, Dict[int, float]] = {}
+    if Shared_nodes is not None and len(Shared_nodes) > 0:
+        for r in Shared_nodes.itertuples(index=False):
+            rid = int(getattr(r, "ring_id"))
+            tid = int(getattr(r, "t_node_id"))
+            eid = int(getattr(r, "e_node_id"))
+            ang = e_ang.get(eid, 0.0)
+            if ang >= float(params.t_gate_ang_shared_deg):
+                hard_by_ring.setdefault(rid, {})[tid] = ang
+
+    # per ring selection
+    for rid, df_ring in T_nodes.groupby("ring_id", sort=False):
+        ring_idx = df_ring.index
+        L = _ring_length_km_from_s(df_ring["s_km"].astype(float).values)
+
+        if params.t_gate_prefer_vertex and "kind" in df_ring.columns:
+            cand_vertex = df_ring[df_ring["kind"].astype(str) == "vertex"]
+            cand_any = df_ring
         else:
-            ll2m_xy, m2ll_xy, ll2m_tuple, m2ll_tuple = _make_ll_m_projectors_from_out(out)
-            collision = _get_collision_metric(out)
-            b = collision.bounds
-            print("[crs] collision.bounds =", b)
-            print("[crs] collision looks like",
-                "DEGREES(lon/lat)" if max(map(abs, b)) < 1000 else "METERS")
-            # ----- debug
-            p = (119.7734, 4.7502)
-            x, y = ll2m_xy(p[0], p[1])
-            print("[crs] ll2m(p) =", (x, y))
-            b = collision.bounds
-            print("[crs] point-in-collision-bounds?", (b[0] <= x <= b[2] and b[1] <= y <= b[3]))
-            print("[crs] collision.bounds =", b)
-            
+            cand_vertex = df_ring
+            cand_any = df_ring
 
-            # ----- debug 
+        selected: Dict[int, str] = {}
 
-            _ll_to_m = lambda a, b=None: ll2m_xy(float(a[0]), float(a[1])) if b is None else ll2m_xy(float(a), float(b))
-            _m_to_ll = lambda a, b=None: m2ll_xy(float(a[0]), float(a[1])) if b is None else m2ll_xy(float(a), float(b))
+        # Tier-0 hard
+        for tid in hard_by_ring.get(int(rid), {}).keys():
+            selected[int(tid)] = "shared_angle"
 
-            
-            if collision is None:
-                print("[collision] not found -> skip repair/simplify")
-                path_ll_for_simplify = [(float(p[0]), float(p[1])) for p in path]
+        def selected_s_list() -> List[float]:
+            if not selected:
+                return []
+            sub = df_ring[df_ring["node_id"].isin(list(selected.keys()))]
+            return sub["s_km"].astype(float).tolist()
+
+        # Tier-1 spacing
+        spacing = float(params.t_gate_spacing_km)
+        min_sep = float(params.t_gate_min_sep_km)
+        if L > 0 and spacing > 0:
+            n_targets = int(math.floor(L / spacing))
+            targets = [i * spacing for i in range(n_targets + 1)]
+            for ts in targets:
+                sel_s = selected_s_list()
+                nid = _pick_nearest_by_s(cand_vertex, ts, sel_s, L=L, min_sep_km=min_sep)
+                if nid is None:
+                    nid = _pick_nearest_by_s(cand_any, ts, sel_s, L=L, min_sep_km=min_sep)
+                if nid is not None and nid not in selected:
+                    selected[int(nid)] = "spacing"
+
+        # Tier-2 fallback min per ring
+        minN = int(params.t_gate_min_per_ring)
+        guard = 0
+        while len(selected) < minN and guard < 10_000:
+            guard += 1
+            sel_s = selected_s_list()
+            nid = _pick_farthest_point(cand_vertex, sel_s, L=L)
+            if nid is None:
+                nid = _pick_farthest_point(cand_any, sel_s, L=L)
+            if nid is None:
+                break
+            if nid not in selected:
+                selected[int(nid)] = "fallback"
             else:
-                collision = _clip_collision_to_aoi_bbox(collision, bbox_ll, ll2m_xy)
-                #print("[collision_full.bounds]", collision_full.bounds)
-                #print("[collision_repair.bounds]", collision_repair.bounds)
-                print("[collision] bounds:", getattr(collision, "bounds", None), "type:", getattr(collision, "geom_type", type(collision)))
-                collision_used = collision
+                break
 
-                path_ll = [(float(p[0]), float(p[1])) for p in path]
+        # Soft cap (keep all hard)
+        cap = int(params.t_gate_max_per_ring)
+        if cap > 0 and len(selected) > cap:
+            hard = [nid for nid, reason in selected.items() if reason == "shared_angle"]
+            soft = [nid for nid, reason in selected.items() if reason != "shared_angle"]
+            keep = set(hard)
+            if len(keep) < cap and soft:
+                soft_df = df_ring[df_ring["node_id"].isin(soft)].sort_values("s_km")
+                k = max(0, cap - len(keep))
+                if k > 0 and len(soft_df) > 0:
+                    idxs = np.linspace(0, len(soft_df) - 1, num=min(k, len(soft_df)), dtype=int)
+                    keep.update(soft_df.iloc[idxs]["node_id"].astype(int).tolist())
+            selected = {nid: selected[nid] for nid in list(selected.keys()) if nid in keep}
 
-                if do_repair:
-                    repairer_obj = PathRepairer(RepairConfig(
-                        debug=True,
-                        rb_n_samples=25,
-                        rb_max_iter=60,
-                        rb_push_step_m=250.0,
-                        rb_smooth_lambda=0.35,
-                    ))
+        sel_ids = set(selected.keys())
+        T_nodes.loc[ring_idx, "is_gate_candidate"] = T_nodes.loc[ring_idx, "node_id"].isin(sel_ids)
+        T_nodes.loc[ring_idx, "gate_reason"] = ""
+        for nid, reason in selected.items():
+            T_nodes.loc[T_nodes["node_id"] == nid, "gate_reason"] = reason
 
-                    # ----------------------------
-                    # (1) Repair inject edges ONLY:
-                    #     - start: path[0] -> path[1] if etype == "start_inject"
-                    #     - end  : path[-2] -> path[-1] if etype == "end_inject"
-                    # ----------------------------
-                    u0, u1 = path[0], path[1]
-                    v1, v0 = path[-2], path[-1]
+    T_gate_candidates = T_nodes[T_nodes["is_gate_candidate"]].copy()
+    return T_nodes, T_gate_candidates
 
-                    et0 = G[u0][u1].get("etype") if G.has_edge(u0, u1) else None
-                    et1 = G[v1][v0].get("etype") if G.has_edge(v1, v0) else None
-                    print("[inject] first edge etype:", et0, "| last edge etype:", et1)
+# -----------------------------
+# Builders
+# -----------------------------
+@dataclass
+class RingGraphBuildParams:
+    # ---- E nodes ----
+    e_angle_feature_deg: float = 25.0   # mark as feature if abs(turn) >= this
 
-                    # start inject polyline
-                    if et0 == "start_inject":
-                        inject_start_ll = repair_snap_link_ll_if_needed(
-                            (float(u0[0]), float(u0[1])),
-                            (float(u1[0]), float(u1[1])),
-                            collision_m=collision,
-                            ll_to_m=_ll_to_m,
-                            m_to_ll=_m_to_ll,
-                            repairer_obj=repairer_obj,
-                        )
-                    else:
-                        inject_start_ll = [(float(u0[0]), float(u0[1])), (float(u1[0]), float(u1[1]))]
+    # ---- T nodes ----
+    t_max_gap_km: float = 20.0          # densify taut edges if longer than this
 
-                    # end inject polyline
-                    if et1 == "end_inject":
-                        inject_end_ll = repair_snap_link_ll_if_needed(
-                            (float(v1[0]), float(v1[1])),
-                            (float(v0[0]), float(v0[1])),
-                            collision_m=collision,
-                            ll_to_m=_ll_to_m,
-                            m_to_ll=_m_to_ll,
-                            repairer_obj=repairer_obj,
-                        )
-                    else:
-                        inject_end_ll = [(float(v1[0]), float(v1[1])), (float(v0[0]), float(v0[1]))]
+    # ---- Shared merge ----
+    shared_tol_m: float = 25.0          # merge tol in meters
 
-                    # ----------------------------
-                    # (2) Repair CORE path only: path[1:-1]
-                    #     This excludes inject edges completely.
-                    # ----------------------------
-                    core_nodes = path[1:-1]  # from u1 .. v1
-                    if core_nodes is None or len(core_nodes) < 2:
-                        core_repaired_ll = [(float(u1[0]), float(u1[1]))] if len(path) >= 2 else []
-                        print("[core] skip repair: core_nodes<2")
-                    else:
-                        core_rep = repairer_obj.repair_path(
-                            G,
-                            core_nodes,
-                            collision_m=collision,
-                            ll_to_m=_ll_to_m,
-                            m_to_ll=_m_to_ll,
-                        )
-                        print("[core-repair]", core_rep.stats)
-                        core_repaired_ll = [(float(p[0]), float(p[1])) for p in core_rep.path_ll]
+    # ---- T gate candidates (selection v1) ----
+    # Hard include: shared nodes whose corresponding E-node has abs(angle_deg) >= threshold.
+    t_gate_ang_shared_deg: float = 15.0
 
-                    # ----------------------------
-                    # (3) Stitch: inject_start + core + inject_end
-                    # ----------------------------
-                    def _extend_no_dup(dst, src):
-                        if not src:
-                            return
-                        if not dst:
-                            dst.extend(src)
-                            return
-                        if dst[-1] == src[0]:
-                            dst.extend(src[1:])
-                        else:
-                            dst.extend(src)
+    # Soft include: add more gates along ring by spacing on T s_km.
+    t_gate_spacing_km: float = 60.0     # target spacing between gates along ring
+    t_gate_min_sep_km: float = 20.0     # minimum separation between selected gates
 
-                    full_ll = []
-                    _extend_no_dup(full_ll, inject_start_ll)
-                    _extend_no_dup(full_ll, core_repaired_ll)
-                    _extend_no_dup(full_ll, inject_end_ll)
+    # Per-ring safety / caps
+    t_gate_min_per_ring: int = 2        # ensure at least N gates per ring
+    t_gate_max_per_ring: int = 25       # (soft) cap for gates per ring
 
-                    path_ll_for_simplify = full_ll
-                    print("[collision used for debug] bounds:", collision.bounds, "type:", collision.geom_type)
-
-                else:
-                    path_ll_for_simplify = path_ll
-
-                # simplify
-                # simplify
-                print(len(path_ll_for_simplify))
-                #for i, (lon, lat) in enumerate(path_ll_for_simplify):
-                    #print(f"[dump] {i:03d}: ({float(lon):.10f}, {float(lat):.10f})")
-                if do_simplify and path_ll_for_simplify is not None and len(path_ll_for_simplify) >= 2:
-                    path_simplified, simp_stats = simplify_path_visibility(
-                        path_ll_for_simplify,
-                        collision_m=collision,
-                        ll_to_m=_ll_to_m,
-                        m_to_ll=_m_to_ll,
-                        window_size=80,
-                        max_tries=300,
-                        use_prepared_collision=True,
-                        dateline_unwrap=True,
-                    )
-                    print("[simplify]", simp_stats)
-                    #for i, (lon, lat) in enumerate(path_simplified):
-                       # print(f"[dump] {i:03d}: ({float(lon):.10f}, {float(lat):.10f})")
-                    p = (119.7734, 4.7502)
-                    print("[crs] _ll_to_m(p)     =", _ll_to_m(p))
-                    # 如果你程式裡還存在 _ll_to_m_any，也一起印
-                    try:
-                        print("[crs] _ll_to_m_any(p) =", _ll_to_m_any(p))
-                    except NameError:
-                        pass
-
-                    # ---------------------------
-                    # 1) Decide CORE final polyline (priority: simplified > repaired_full > original A*)
-                    # ---------------------------
-                    core_final_ll = None
-                    if path_simplified is not None and len(path_simplified) >= 2:
-                        core_final_ll = [(float(p[0]), float(p[1])) for p in path_simplified]
-                    elif path_ll_for_simplify is not None and len(path_ll_for_simplify) >= 2:
-                        core_final_ll = [(float(p[0]), float(p[1])) for p in path_ll_for_simplify]
-                    elif path is not None and len(path) >= 2:
-                        core_final_ll = [(float(p[0]), float(p[1])) for p in path]
-
-                    # ---------------------------
-                    # 2) Build snap-links (origin->start_key, end_key->dest) and MERGE into FINAL
-                    # ---------------------------
-                    final_ll = core_final_ll
-
-                    if core_final_ll is not None and len(core_final_ll) >= 2:
-                        # snap-link start
-                        if origin_ll != start_key:
-                            snap_start_ll = repair_snap_link_ll_if_needed(
-                                origin_ll, start_key,
-                                collision_m=collision,
-                                ll_to_m=_ll_to_m,
-                                m_to_ll=_m_to_ll,
-                                repairer_obj=repairer_obj,   # 你前面已經建過 PathRepairer 了，直接重用
-                            )
-                        else:
-                            snap_start_ll = [origin_ll]
-
-                        # snap-link end
-                        if end_key != dest_ll:
-                            snap_end_ll = repair_snap_link_ll_if_needed(
-                                end_key, dest_ll,
-                                collision_m=collision,
-                                ll_to_m=_ll_to_m,
-                                m_to_ll=_m_to_ll,
-                                repairer_obj=repairer_obj,
-                            )
-                        else:
-                            snap_end_ll = [dest_ll]
-
-                        # merge without duplicate joints
-                        merged = []
-                        if snap_start_ll and len(snap_start_ll) >= 2:
-                            merged.extend([(float(p[0]), float(p[1])) for p in snap_start_ll])
-                        else:
-                            merged.append((float(origin_ll[0]), float(origin_ll[1])))
-
-                        # connect to core
-                        if merged and core_final_ll:
-                            if merged[-1] == core_final_ll[0]:
-                                merged.extend(core_final_ll[1:])
-                            else:
-                                merged.extend(core_final_ll)
-
-                        # connect end snap-link
-                        if snap_end_ll and len(snap_end_ll) >= 2:
-                            snap_end_ll = [(float(p[0]), float(p[1])) for p in snap_end_ll]
-                            if merged and merged[-1] == snap_end_ll[0]:
-                                merged.extend(snap_end_ll[1:])
-                            else:
-                                merged.extend(snap_end_ll)
-
-                        final_ll = merged
-
-                    # ---------------------------
-                    # 3) Distance on FINAL (includes snap-links!)
-                    # ---------------------------
-                    if final_ll is not None and len(final_ll) >= 2:
-                        total_km, total_nm = path_length_km_nm(final_ll, dateline_unwrap=True)
-                        print(f"[distance] final route = {format_distance(total_km, total_nm)}")
-
-                        try:
-                            out["_p2p_last_distance"] = {"km": float(total_km), "nm": float(total_nm)}
-                        except Exception:
-                            pass
-                    else:
-                        print("[distance] skip: no final polyline")
-                else:
-                    print("[simplify] skip")
-                
-
-    # ---------------------------
-    # folium map + layers
-    # ---------------------------
-    m = folium.Map(location=center, zoom_start=zoom_start, control_scale=True)
-    folium.Rectangle(bounds=[[min_lat, min_lon], [max_lat, max_lon]], fill=False, weight=3, opacity=0.9).add_to(m)
-    m.fit_bounds([[min_lat, min_lon], [max_lat, max_lon]])
-
-    # draw collision used (optional)    
-    try:
-        collision_viz = collision_used
-        if collision_viz is not None:
-            print("[collision viz EXACT] bounds:", getattr(collision_viz, "bounds", None),
-                  "type:", getattr(collision_viz, "geom_type", type(collision_viz)))
-
-            # Use the same projector as the algorithm
-            _, m2ll_xy, _, _ = _make_ll_m_projectors_from_out(out)
-
-            # IMPORTANT: no extra clipping here, no viz_box intersection.
-            # This ensures what you see == what simplify used.
-            col_ll = _geom_m_to_ll(collision_viz, m2ll_xy)
-
-            fgCol = folium.FeatureGroup(name="Collision (USED, exact ll)", show=False)
-            folium.GeoJson(
-                data=col_ll.__geo_interface__,
-                style_function=lambda _: {"fillColor": "#3b82f6", "color": "#3b82f6", "weight": 2, "fillOpacity": 0.15},
-            ).add_to(fgCol)
-            fgCol.add_to(m)
-    except Exception as e:
-        print("[viz] collision layer failed:", repr(e))
-
-    def circle_layer(df, name, radius, show=True):
-        fg = folium.FeatureGroup(name=name, show=show)
-        for _, r in df.iterrows():
-            p = (float(r["lon"]), float(r["lat"]))
-            if not in_bbox(p, bbox_ll):
-                continue
-            folium.CircleMarker([p[1], p[0]], radius=radius).add_to(fg)
-        fg.add_to(m)
-
-    # --- node layers ---
-    if isinstance(C_nodes, pd.DataFrame) and len(C_nodes) > 0:
-        nC = len(C_nodes)
-        dfC_plot = C_nodes.sample(min(int(c_sample), nC), random_state=7) if nC > c_sample else C_nodes
-        circle_layer(dfC_plot, f"C_nodes (sample {len(dfC_plot)}/{nC})", radius=1, show=False)
-
-    if isinstance(dfGB, pd.DataFrame) and len(dfGB) > 0:
-        circle_layer(dfGB, f"Gate_B ({len(dfGB)})", radius=6, show=False)
-
-    if isinstance(S_nodes, pd.DataFrame) and len(S_nodes) > 0:
-        nS = len(S_nodes)
-        if s_sample is not None and nS > int(s_sample):
-            dfS_plot = S_nodes.sample(int(s_sample), random_state=7)
-            title = f"S_nodes (sample {len(dfS_plot)}/{nS})"
-        else:
-            dfS_plot = S_nodes
-            title = f"S_nodes ({nS})"
-        circle_layer(dfS_plot, title, radius=3, show=False)
-
-    # --- sea edges (viz) ---
-    def sea_lonlat_by_idx(i):
-        s = S_nodes.iloc[int(i)]
-        return (float(s["lon"]), float(s["lat"]))
-
-    if isinstance(S_nodes, pd.DataFrame) and S_edges is not None and len(S_edges) > 0:
-        fgE = folium.FeatureGroup(name=f"S_edges (show {min(len(S_edges), max_sea_edges_viz)}/{len(S_edges)})", show=True)
-        take = S_edges[:max_sea_edges_viz] if len(S_edges) > max_sea_edges_viz else S_edges
-        drawn = 0
-        for e in take:
-            seg = edge_to_lonlat(e, nodes_df=S_nodes, idx_to_lonlat_fn=sea_lonlat_by_idx)
-            if seg is None:
-                continue
-            u, v = seg
-            if not (in_bbox(u, bbox_ll) or in_bbox(v, bbox_ll)):
-                continue
-            folium.PolyLine([[u[1], u[0]], [v[1], v[0]]], color="#3352ff", weight=2, opacity=0.6).add_to(fgE)
-            drawn += 1
-        fgE.add_to(m)
-        print(f"[viz] sea edges drawn: {drawn}/{len(take)}")
-
-    # --- GateB→Sea connectors (viz) ---
-    if isinstance(dfGB_conn, pd.DataFrame) and isinstance(S_nodes, pd.DataFrame) and gate_xy:
-        fgConn = folium.FeatureGroup(name=f"GateB→Sea connectors ({len(dfGB_conn)})", show=False)
-        drawn = 0
-        for _, r in dfGB_conn.iterrows():
-            try:
-                gid = int(r["g_id"])
-                if gid not in gate_xy:
-                    continue
-                gb = gate_xy[gid]
-                if not in_bbox(gb, bbox_ll):
-                    continue
-                sea = sea_lonlat_by_idx(int(r["sea_idx"]))
-                if not (in_bbox(gb, bbox_ll) or in_bbox(sea, bbox_ll)):
-                    continue
-                folium.PolyLine([[gb[1], gb[0]], [sea[1], sea[0]]], weight=2, opacity=0.7).add_to(fgConn)
-                drawn += 1
-            except Exception:
-                continue
-        fgConn.add_to(m)
-        print(f"[viz] GateB→Sea connectors drawn: {drawn}/{len(dfGB_conn)}")
-
-    # --- C↔GateB bridge connectors (viz) ---
-    if isinstance(cgb_df, pd.DataFrame) and len(cgb_df) > 0:
-        fgCGB = folium.FeatureGroup(name=f"C↔GateB bridge (nearest) ({len(cgb_df)})", show=False)
-        for _, r in cgb_df.iterrows():
-            c = (float(r["c_lon"]), float(r["c_lat"]))
-            gb = (float(r["g_lon"]), float(r["g_lat"]))
-            folium.PolyLine([[c[1], c[0]], [gb[1], gb[0]]], weight=2, opacity=0.7).add_to(fgCGB)
-        fgCGB.add_to(m)
-
-    # --- start/end markers + candidates ---
-    fgSE = folium.FeatureGroup(name="Start/End + snapped candidates", show=True)
-    folium.Marker([origin_ll[1], origin_ll[0]], tooltip="START (input)").add_to(fgSE)
-    folium.Marker([dest_ll[1], dest_ll[0]], tooltip="END (input)").add_to(fgSE)
-
-    if start_key != origin_ll:
-        folium.CircleMarker([start_key[1], start_key[0]], radius=7, opacity=0.9, tooltip="START (used / nudged)").add_to(fgSE)
-    if end_key != dest_ll:
-        folium.CircleMarker([end_key[1], end_key[0]], radius=7, opacity=0.9, tooltip="END (used / nudged)").add_to(fgSE)
-
-    for i, c in enumerate(pair.start_pick):
-        folium.CircleMarker([c.node_ll[1], c.node_ll[0]], color="#6f42c1", radius=6, tooltip=f"start_cand#{i} d={c.dist_km:.1f}km").add_to(fgSE)
-    for i, c in enumerate(pair.end_pick):
-        folium.CircleMarker([c.node_ll[1], c.node_ll[0]], color="#6f42c1", radius=6, tooltip=f"end_cand#{i} d={c.dist_km:.1f}km").add_to(fgSE)
-    fgSE.add_to(m)
-
-    # --- route layers ---
-    if path is not None and len(path) >= 2:
-        fgA = folium.FeatureGroup(name="Route: A* (original core)", show=True)
-        path_u = route_polyline_dateline_safe([(float(p[0]), float(p[1])) for p in path])
-        folium.PolyLine([[p[1], p[0]] for p in path_u], color="#d62728", weight=6, opacity=0.95).add_to(fgA)
-        fgA.add_to(m)
-
-        #  Inject edges (the two edges you care about)
-        has_inj_start = (inject_start_ll is not None and len(inject_start_ll) >= 2 and inject_start_ll[0] != inject_start_ll[-1])
-        has_inj_end   = (inject_end_ll   is not None and len(inject_end_ll)   >= 2 and inject_end_ll[0]   != inject_end_ll[-1])
-        if has_inj_start or has_inj_end:
-            fgSL = folium.FeatureGroup(name="Route: Inject edges (repaired if needed)", show=True)
-            if has_inj_start:
-                sl1 = route_polyline_dateline_safe([(float(p[0]), float(p[1])) for p in inject_start_ll])
-                folium.PolyLine([[p[1], p[0]] for p in sl1], color="#9467bd", weight=5, opacity=0.92).add_to(fgSL)
-            if has_inj_end:
-                sl2 = route_polyline_dateline_safe([(float(p[0]), float(p[1])) for p in inject_end_ll])
-                folium.PolyLine([[p[1], p[0]] for p in sl2], color="#9467bd", weight=5, opacity=0.92).add_to(fgSL)
-            fgSL.add_to(m)
-
-        # repaired full (pre-simplify)
-        if path_ll_for_simplify is not None and len(path_ll_for_simplify) >= 2:
-            fgR = folium.FeatureGroup(name="Route: Repaired (FULL, pre-simplify)", show=True)
-            repaired_ll = [(float(p[0]), float(p[1])) for p in path_ll_for_simplify]
-            path_ru = route_polyline_dateline_safe(repaired_ll)
-            folium.PolyLine([[p[1], p[0]] for p in path_ru], color="#2ca02c", weight=5, opacity=0.90).add_to(fgR)
-            fgR.add_to(m)
-
-        # simplified
-        if path_simplified is not None and len(path_simplified) >= 2:
-            fgS = folium.FeatureGroup(name="Route: Simplified (visibility)", show=True)
-            path_su = route_polyline_dateline_safe([(float(p[0]), float(p[1])) for p in path_simplified])
-            folium.PolyLine([[p[1], p[0]] for p in path_su], color="#ff7f0e", weight=5, opacity=0.95).add_to(fgS)
-            fgS.add_to(m)
-        
-        # --- FINAL route (with snap-links) ---
-        if final_ll is not None and len(final_ll) >= 2:
-            fgF = folium.FeatureGroup(name="Route: FINAL (simplified + snap-links)", show=True)
-            final_u = route_polyline_dateline_safe(final_ll)
-            folium.PolyLine([[p[1], p[0]] for p in final_u], weight=6, opacity=0.95).add_to(fgF)
-            fgF.add_to(m)
-
-    folium.LayerControl(collapsed=False).add_to(m)
-
-    html_path = Path(html_path).resolve()
-    m.save(str(html_path))
-    webbrowser.open(html_path.as_uri())
-    return html_path
+    # Candidate preference: choose among T nodes with kind=="vertex" first
+    t_gate_prefer_vertex: bool = True
 
 
-# =========================
-# === call
-# =========================
-origin_ll = (128.52636, -30.38197)
-dest_ll   = (119.82013, 13.85607)
+def build_ring_nodes_edges(
+    rings: List[RingResult],
+    *,
+    proj: Any,
+    cfg: RingBuildConfig,
+    params: Optional[RingGraphBuildParams] = None,
+) -> Dict[str, pd.DataFrame]:
+    """
+    Build E/T/shared nodes and E/T edges from ring results.
 
-open_routing_debug_map_p2p(
-    out,
-    origin_ll=origin_ll,
-    dest_ll=dest_ll,
-    html_path="aoi_p2p_map.html",
-    zoom_start=5,
-    include_sea=True,
-    include_cc=True,
-    include_gateb_sea=True,
-    use_c_gateb_bridge=True,
-    c_to_gateB_max_deg_dist=None,
-    k_near=30,
-    r_max_km_snap=150,
-    k_inject=4,
-    do_repair=True,
-    do_simplify=True,
-)
+    Returns dict of DataFrames:
+      - E_nodes, T_nodes, Shared_nodes
+      - E_edges, T_edges
+    """
+    if params is None:
+        params = RingGraphBuildParams()
+
+    e_nodes_rows: List[Dict[str, Any]] = []
+    t_nodes_rows: List[Dict[str, Any]] = []
+    shared_rows: List[Dict[str, Any]] = []
+    e_edges_rows: List[Dict[str, Any]] = []
+    t_edges_rows: List[Dict[str, Any]] = []
+
+    # temporary structures per ring for shared matching
+    all_e_xy: List[Tuple[int, int, XY]] = []  # (ring_id, e_node_id, (x,y))
+    all_t_xy: List[Tuple[int, int, XY]] = []  # (ring_id, t_node_id, (x,y))
+
+    e_node_id = 0
+    t_node_id = 0
+
+    for r in rings:
+        ring_id = int(r.ring_id)
+
+        # ---- E nodes (from envelope pts as-is: already approx equal spacing cfg.ring_sample_km)
+        e_pts = _unique_closed_pts(r.envelope_pts_m)
+        nE = len(e_pts)
+        if nE >= 3:
+            s_km = _cum_s_km_closed(e_pts)
+            for i, (x, y) in enumerate(e_pts):
+                prev = e_pts[(i - 1) % nE]
+                nxt = e_pts[(i + 1) % nE]
+                ang = _turn_angle_deg(prev, (x, y), nxt)
+                kind = "feature" if abs(ang) >= float(params.e_angle_feature_deg) else "eq"
+                lon, lat = _m2ll_safe(proj, x, y)
+                row = dict(
+                    node_id=e_node_id,
+                    ring_id=ring_id,
+                    seq=int(i),
+                    x_m=float(x),
+                    y_m=float(y),
+                    lon=float(lon),
+                    lat=float(lat),
+                    s_km=float(s_km[i]),
+                    angle_deg=float(ang),
+                    kind=str(kind),
+                    is_shared=False,
+                )
+                e_nodes_rows.append(row)
+                all_e_xy.append((ring_id, e_node_id, (float(x), float(y))))
+                e_node_id += 1
+
+            # E edges along seq + closure
+            # edges reference node_id; we need ring-local mapping seq->node_id
+            ring_e_node_ids = [row["node_id"] for row in e_nodes_rows[-nE:]]
+            for i in range(nE):
+                u = ring_e_node_ids[i]
+                v = ring_e_node_ids[(i + 1) % nE]
+                e_edges_rows.append(dict(
+                    etype="E_RING",
+                    ring_id=ring_id,
+                    u=int(u),
+                    v=int(v),
+                    seq=int(i),
+                ))
+
+        # ---- T nodes (from taut pts, densified)
+        t_pts0 = _unique_closed_pts(r.taut_pts_m if r.taut_pts_m else r.envelope_pts_m)
+        nT0 = len(t_pts0)
+        if nT0 >= 3:
+            # build densified sequence
+            t_pts: List[Tuple[XY, str]] = []  # (pt, kind)
+            for i in range(nT0):
+                a = t_pts0[i]
+                b = t_pts0[(i + 1) % nT0]
+                t_pts.append((a, "vertex"))
+                fills = _densify_segment(a, b, max_gap_km=float(params.t_max_gap_km))
+                for p in fills:
+                    t_pts.append((p, "fill"))
+
+            # remove possible duplicates due to densify edge cases
+            pts_only = [p for p, _ in t_pts]
+            kinds = [k for _, k in t_pts]
+            # if last equals first, drop last
+            if len(pts_only) >= 2 and pts_only[0] == pts_only[-1]:
+                pts_only = pts_only[:-1]
+                kinds = kinds[:-1]
+
+            nT = len(pts_only)
+            s_km_t = _cum_s_km_closed(pts_only)
+            ring_t_node_ids: List[int] = []
+            for i, (pt, kind) in enumerate(zip(pts_only, kinds)):
+                x, y = pt
+                lon, lat = _m2ll_safe(proj, x, y)
+                row = dict(
+                    node_id=t_node_id,
+                    ring_id=ring_id,
+                    seq=int(i),
+                    x_m=float(x),
+                    y_m=float(y),
+                    lon=float(lon),
+                    lat=float(lat),
+                    s_km=float(s_km_t[i]),
+                    kind=str(kind),
+                    is_gate_candidate=False,  # gate selection later
+                    gate_reason="",
+                    is_shared=False,
+                )
+                t_nodes_rows.append(row)
+                all_t_xy.append((ring_id, t_node_id, (float(x), float(y))))
+                ring_t_node_ids.append(t_node_id)
+                t_node_id += 1
+
+            # T edges along seq + closure
+            for i in range(nT):
+                u = ring_t_node_ids[i]
+                v = ring_t_node_ids[(i + 1) % nT]
+                t_edges_rows.append(dict(
+                    etype="T_RING",
+                    ring_id=ring_id,
+                    u=int(u),
+                    v=int(v),
+                    seq=int(i),
+                ))
+
+    # ---- Shared nodes: merge E and T within tol per ring
+    tol = float(params.shared_tol_m)
+    # index T nodes by quantized grid per ring
+    grid = max(1.0, tol)
+    t_index: Dict[Tuple[int, int, int], List[Tuple[int, XY]]] = {}
+    for ring_id, tid, (x, y) in all_t_xy:
+        gx = int(round(x / grid))
+        gy = int(round(y / grid))
+        key = (int(ring_id), gx, gy)
+        t_index.setdefault(key, []).append((tid, (x, y)))
+
+    # for each E, search in neighboring grid cells
+    shared_id = 0
+    e_is_shared = set()
+    t_is_shared = set()
+
+    for ring_id, eid, (x, y) in all_e_xy:
+        gx = int(round(x / grid))
+        gy = int(round(y / grid))
+        found = None
+        best_d = None
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                key = (int(ring_id), gx + dx, gy + dy)
+                for tid, (tx, ty) in t_index.get(key, []):
+                    d = math.hypot(tx - x, ty - y)
+                    if d <= tol and (best_d is None or d < best_d):
+                        best_d = d
+                        found = (tid, tx, ty)
+        if found is not None:
+            tid, tx, ty = found
+            e_is_shared.add(eid)
+            t_is_shared.add(tid)
+            lon, lat = _m2ll_safe(proj, x, y)
+            shared_rows.append(dict(
+                shared_id=int(shared_id),
+                ring_id=int(ring_id),
+                e_node_id=int(eid),
+                t_node_id=int(tid),
+                x_m=float(x),
+                y_m=float(y),
+                lon=float(lon),
+                lat=float(lat),
+                tol_m=float(best_d if best_d is not None else 0.0),
+            ))
+            shared_id += 1
+
+    # mark flags in node tables
+    if e_nodes_rows:
+        for row in e_nodes_rows:
+            if row["node_id"] in e_is_shared:
+                row["is_shared"] = True
+    if t_nodes_rows:
+        for row in t_nodes_rows:
+            if row["node_id"] in t_is_shared:
+                row["is_shared"] = True
+
+    E_nodes = pd.DataFrame(e_nodes_rows)
+    T_nodes = pd.DataFrame(t_nodes_rows)
+    Shared_nodes = pd.DataFrame(shared_rows)
+
+    T_nodes = add_t_turn_angles(T_nodes)
+
+    T_nodes, T_gate_candidates = select_t_gate_candidates(
+        E_nodes, T_nodes, Shared_nodes, params=params
+    )
+
+    # ---- Select T gate candidates (updates T_nodes + returns a convenient subset table)
+    T_nodes, T_gate_candidates = select_t_gate_candidates(
+        E_nodes, T_nodes, Shared_nodes, params=params
+    )
+    E_edges = pd.DataFrame(e_edges_rows)
+    T_edges = pd.DataFrame(t_edges_rows)
+
+    return {
+        "E_nodes": E_nodes,
+        "T_nodes": T_nodes,
+        "Shared_nodes": Shared_nodes,
+        "E_edges": E_edges,
+        "T_edges": T_edges,
+        "T_gate_candidates": T_gate_candidates,
+    }

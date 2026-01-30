@@ -12,6 +12,8 @@ Author: ChatGPT (generated)
 """
 from __future__ import annotations
 
+import math
+
 from dataclasses import dataclass
 from typing import Callable, Iterable, List, Optional, Sequence, Tuple, Union, Dict, Any
 
@@ -68,6 +70,91 @@ def _unwrap_path_ll(path_ll: Sequence[LonLat]) -> List[LonLat]:
         out.append((lon_u, float(lat)))
         ref = lon_u
     return out
+
+
+# --- Great-circle (spherical) segment densification ---
+# Used for collision checks so that "skip" decisions reflect great-circle routing, not planar straight lines.
+_EARTH_R_KM = 6371.0088
+_GC_STEP_KM_DEFAULT = 10.0  # fixed step to avoid changing public function signatures
+
+
+def _gc_densify_ll(p0: LonLat, p1: LonLat, *, step_km: float = _GC_STEP_KM_DEFAULT) -> List[LonLat]:
+    """Densify the great-circle path from p0 to p1 into a polyline in lon/lat.
+
+    Notes
+    -----
+    - Assumes longitudes are already continuous if you enabled dateline_unwrap upstream.
+    - Returns a list including both endpoints.
+    """
+
+    lon0, lat0 = float(p0[0]), float(p0[1])
+    lon1, lat1 = float(p1[0]), float(p1[1])
+
+    # Convert to unit vectors on the sphere
+    def _to_vec(lon_deg: float, lat_deg: float) -> Tuple[float, float, float]:
+        lon = math.radians(lon_deg)
+        lat = math.radians(lat_deg)
+        clat = math.cos(lat)
+        return (clat * math.cos(lon), clat * math.sin(lon), math.sin(lat))
+
+    def _dot(a: Tuple[float, float, float], b: Tuple[float, float, float]) -> float:
+        return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+
+    def _norm(a: Tuple[float, float, float]) -> float:
+        return math.sqrt(_dot(a, a))
+
+    def _scale(a: Tuple[float, float, float], s: float) -> Tuple[float, float, float]:
+        return (a[0] * s, a[1] * s, a[2] * s)
+
+    def _add(a: Tuple[float, float, float], b: Tuple[float, float, float]) -> Tuple[float, float, float]:
+        return (a[0] + b[0], a[1] + b[1], a[2] + b[2])
+
+    def _unit(a: Tuple[float, float, float]) -> Tuple[float, float, float]:
+        n = _norm(a)
+        if n <= 0.0:
+            return (0.0, 0.0, 0.0)
+        return (a[0] / n, a[1] / n, a[2] / n)
+
+    def _to_lonlat(v: Tuple[float, float, float]) -> LonLat:
+        x, y, z = v
+        lon = math.degrees(math.atan2(y, x))
+        hyp = math.hypot(x, y)
+        lat = math.degrees(math.atan2(z, hyp))
+        return (lon, lat)
+
+    u = _to_vec(lon0, lat0)
+    v = _to_vec(lon1, lat1)
+
+    # Central angle
+    dot_uv = max(-1.0, min(1.0, _dot(u, v)))
+    omega = math.acos(dot_uv)
+    dist_km = _EARTH_R_KM * omega
+
+    if step_km <= 0.0 or dist_km <= step_km or omega < 1e-12:
+        return [(lon0, lat0), (lon1, lat1)]
+
+    n_seg = max(1, int(math.ceil(dist_km / step_km)))
+    so = math.sin(omega)
+
+    out: List[LonLat] = []
+    ref_lon = lon0
+    for k in range(n_seg + 1):
+        t = k / n_seg
+        a = math.sin((1.0 - t) * omega) / so
+        b = math.sin(t * omega) / so
+        w = _add(_scale(u, a), _scale(v, b))
+        w = _unit(w)
+        lon, lat = _to_lonlat(w)
+        # keep longitude continuous w.r.t the previous point
+        lon = _unwrap_lon(lon, ref_lon)
+        ref_lon = lon
+        out.append((lon, lat))
+
+    # Ensure exact endpoints (preserve original inputs)
+    out[0] = (lon0, lat0)
+    out[-1] = (lon1, lat1)
+    return out
+
 
 
 def _coalesce_consecutive_duplicates(path: Sequence[LonLat], *, eps: float = 0.0) -> List[LonLat]:
@@ -262,7 +349,10 @@ def simplify_path_visibility(
     def seg_ok(i_: int, j_: int) -> bool:
         nonlocal n_checks, n_blocked
         n_checks += 1
-        ls = LineString([path_m[i_], path_m[j_]])
+        # Great-circle collision check: densify (lon/lat) along GC, then project and test.
+        gc_ll = _gc_densify_ll(path_use[i_], path_use[j_])
+        gc_m = [ll2m(p) for p in gc_ll]
+        ls = LineString(gc_m)
         ok = not col_prep.intersects(ls)
         if not ok:
             n_blocked += 1

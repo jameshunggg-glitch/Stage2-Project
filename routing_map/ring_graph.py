@@ -590,10 +590,6 @@ def build_ring_nodes_edges(
 
     T_nodes = add_t_turn_angles(T_nodes)
 
-    T_nodes, T_gate_candidates = select_t_gate_candidates(
-        E_nodes, T_nodes, Shared_nodes, params=params
-    )
-
     # ---- Select T gate candidates (updates T_nodes + returns a convenient subset table)
     T_nodes, T_gate_candidates = select_t_gate_candidates(
         E_nodes, T_nodes, Shared_nodes, params=params
@@ -601,6 +597,30 @@ def build_ring_nodes_edges(
     E_edges = pd.DataFrame(e_edges_rows)
     T_edges = pd.DataFrame(t_edges_rows)
 
+
+    # --- Node/edge keys for global graph (keep int ids internally, expose string keys)
+    if isinstance(E_nodes, pd.DataFrame) and "node_id" in E_nodes.columns:
+        E_nodes["node_key"] = E_nodes["node_id"].map(lambda i: f"E:{int(i)}")
+    if isinstance(T_nodes, pd.DataFrame) and "node_id" in T_nodes.columns:
+        T_nodes["node_key"] = T_nodes["node_id"].map(lambda i: f"T:{int(i)}")
+    if isinstance(Shared_nodes, pd.DataFrame):
+        if "e_node_id" in Shared_nodes.columns:
+            Shared_nodes["e_key"] = Shared_nodes["e_node_id"].map(lambda i: f"E:{int(i)}")
+        if "t_node_id" in Shared_nodes.columns:
+            Shared_nodes["t_key"] = Shared_nodes["t_node_id"].map(lambda i: f"T:{int(i)}")
+
+    if isinstance(E_edges, pd.DataFrame) and "u" in E_edges.columns and "v" in E_edges.columns:
+        E_edges["u_key"] = E_edges["u"].map(lambda i: f"E:{int(i)}")
+        E_edges["v_key"] = E_edges["v"].map(lambda i: f"E:{int(i)}")
+    if isinstance(T_edges, pd.DataFrame) and "u" in T_edges.columns and "v" in T_edges.columns:
+        T_edges["u_key"] = T_edges["u"].map(lambda i: f"T:{int(i)}")
+        T_edges["v_key"] = T_edges["v"].map(lambda i: f"T:{int(i)}")
+
+    # If gate candidates exist, add t_node_key for downstream connectors
+    if isinstance(T_gate_candidates, pd.DataFrame) and "t_node_id" in T_gate_candidates.columns:
+        T_gate_candidates["t_node_key"] = T_gate_candidates["t_node_id"].map(lambda i: f"T:{int(i)}")
+
+    
     return {
         "E_nodes": E_nodes,
         "T_nodes": T_nodes,

@@ -14,6 +14,99 @@ XY = Tuple[float, float]
 
 
 # ---------------------------
+# Dateline-safe lon helpers
+# ---------------------------
+
+def wrap_lon(lon: float) -> float:
+    """Wrap longitude into [-180, 180)."""
+    x = float(lon)
+    x = (x + 180.0) % 360.0 - 180.0
+    if x >= 180.0:
+        x -= 360.0
+    return x
+
+def unwrap_lon(lon: float, ref_lon: float) -> float:
+    """Unwrap `lon` so it is closest to `ref_lon` (degrees), returning a continuous longitude."""
+    lon = float(lon)
+    ref = float(ref_lon)
+    d = (lon - ref + 180.0) % 360.0 - 180.0
+    return ref + d
+
+def coord_id(lon: float, lat: float, nd: int = 6, prefix: str = "") -> str:
+    """Stable node id from (lon,lat). Uses wrapped lon and fixed decimals."""
+    lo = wrap_lon(float(lon))
+    la = float(lat)
+    core = f"{lo:.{nd}f},{la:.{nd}f}"
+    return f"{prefix}{core}" if prefix else core
+
+def ll_to_xy_m(proj: "AOIProjector", lon: float, lat: float) -> XY:
+    """Project lon/lat to metric x/y (meters) with dateline-safe lon unwrap."""
+    lon0 = float(getattr(proj, "lon0", 0.0))
+    lo = unwrap_lon(float(lon), lon0)
+    x, y = proj.to_m.transform(lo, float(lat))
+    return float(x), float(y)
+
+def split_antimeridian_polyline(path_ll: List[LonLat]) -> List[List[LonLat]]:
+    """Split a lon/lat polyline into segments that do not jump across the antimeridian.
+
+    This version *inserts* intersection points on +/-180° so each segment is drawable on web maps
+    without a long world-spanning line.
+
+    Input and output longitudes are wrapped to [-180,180).
+    """
+    if not path_ll or len(path_ll) < 2:
+        return [path_ll or []]
+
+    def _unwrap_to(lon: float, ref: float) -> float:
+        return unwrap_lon(lon, ref)
+
+    out: List[List[LonLat]] = []
+    seg: List[LonLat] = [(wrap_lon(path_ll[0][0]), float(path_ll[0][1]))]
+
+    for lon2, lat2 in path_ll[1:]:
+        lon1, lat1 = seg[-1]
+        lon2w = wrap_lon(lon2)
+        lat2f = float(lat2)
+
+        # Unwrap lon2 near lon1 to reason about crossing
+        lon2u = _unwrap_to(lon2w, lon1)
+        lon1u = float(lon1)
+
+        if abs(lon2u - lon1u) <= 180.0:
+            seg.append((wrap_lon(lon2u), lat2f))
+            continue
+
+        # Determine which antimeridian boundary we cross in unwrapped space
+        # If moving positive and crossing >180, boundary is +180; if moving negative, boundary is -180.
+        if lon2u > lon1u:
+            boundary = 180.0
+            # ensure boundary lies between
+            while boundary < lon1u:
+                boundary += 360.0
+        else:
+            boundary = -180.0
+            while boundary > lon1u:
+                boundary -= 360.0
+
+        # Linear interpolation in lon/lat (ok for drawing split point)
+        t = (boundary - lon1u) / (lon2u - lon1u) if lon2u != lon1u else 0.0
+        t = max(0.0, min(1.0, t))
+        lat_cross = lat1 + t * (lat2f - lat1)
+
+        # End current segment at boundary (wrapped)
+        seg.append((wrap_lon(boundary), float(lat_cross)))
+        if len(seg) >= 2:
+            out.append(seg)
+
+        # Start new segment from opposite boundary to target point
+        opp = -180.0 if wrap_lon(boundary) > 0 else 180.0
+        seg = [(wrap_lon(opp), float(lat_cross)), (wrap_lon(lon2u), lat2f)]
+
+    if len(seg) >= 2:
+        out.append(seg)
+    return out
+
+# ---------------------------
 # Backward compatible helpers
 # ---------------------------
 
@@ -53,16 +146,21 @@ def make_aoi_bbox(bbox_ll: BBoxLL) -> BBoxLL:
 
 @dataclass
 class AOIProjector:
-    """Local metric projection centered at AOI centroid (AEQD)."""
+    """Local metric projection centered at AOI centroid (AEQD).
 
+    Notes:
+    - `lon0` is stored for dateline-safe lon unwrapping.
+    """
+
+    lon0: float
+    lat0: float
     crs_ll: CRS
     crs_m: CRS
     to_m: Transformer
     to_ll: Transformer
 
     def ll2m(self, lon: float, lat: float) -> XY:
-        x, y = self.to_m.transform(float(lon), float(lat))
-        return float(x), float(y)
+        return ll_to_xy_m(self, lon, lat)
 
     def m2ll(self, x: float, y: float) -> LonLat:
         lon, lat = self.to_ll.transform(float(x), float(y))
@@ -88,7 +186,7 @@ def build_projector_from_bbox(bbox_ll: BBoxLL) -> AOIProjector:
     )
     to_m = Transformer.from_crs(crs_ll, crs_m, always_xy=True)
     to_ll = Transformer.from_crs(crs_m, crs_ll, always_xy=True)
-    return AOIProjector(crs_ll=crs_ll, crs_m=crs_m, to_m=to_m, to_ll=to_ll)
+    return AOIProjector(lon0=float(lon0), lat0=float(lat0), crs_ll=crs_ll, crs_m=crs_m, to_m=to_m, to_ll=to_ll)
 
 
 def geom_to_m(geom, proj: AOIProjector):

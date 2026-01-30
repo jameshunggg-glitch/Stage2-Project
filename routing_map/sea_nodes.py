@@ -5,14 +5,7 @@ import networkx as nx
 from typing import Any, Dict, Tuple, List, Optional
 from sklearn.neighbors import KDTree
 
-from .geom_utils import AOIProjector
-
-def coord_id(lon: float, lat: float, nd: int = 6) -> str:
-    return f"{float(lon):.{nd}f},{float(lat):.{nd}f}"
-
-def ll_to_xy_m(proj: AOIProjector, lon: float, lat: float) -> tuple[float, float]:
-    # AOIProjector has Transformer
-    return proj.to_m.transform(lon, lat)
+from .geom_utils import AOIProjector, coord_id, ll_to_xy_m
 
 def build_sea_nodes_from_bundle(
     proj: AOIProjector,
@@ -49,7 +42,7 @@ def build_sea_nodes_from_bundle(
 
     pts_unique = sorted(set(pts))
     S_nodes = pd.DataFrame(pts_unique, columns=["lon","lat"])
-    S_nodes["node_id"] = [coord_id(lo, la) for lo, la in S_nodes[["lon","lat"]].to_numpy()]
+    S_nodes["node_id"] = [coord_id(lo, la, prefix="S:") for lo, la in S_nodes[["lon","lat"]].to_numpy()]
 
     # metric coords
     xy = np.array([ll_to_xy_m(proj, lo, la) for lo, la in S_nodes[["lon","lat"]].to_numpy()], dtype=float)
@@ -68,8 +61,8 @@ def build_sea_nodes_from_bundle(
         a, b = e
         if not (isinstance(a,(tuple,list)) and len(a)==2 and isinstance(b,(tuple,list)) and len(b)==2):
             continue
-        na = coord_id(a[0], a[1])
-        nb = coord_id(b[0], b[1])
+        na = coord_id(a[0], a[1], prefix="S:")
+        nb = coord_id(b[0], b[1], prefix="S:")
         G.add_edge(na, nb)
         norm_edges.append(((float(a[0]), float(a[1])), (float(b[0]), float(b[1]))))
 

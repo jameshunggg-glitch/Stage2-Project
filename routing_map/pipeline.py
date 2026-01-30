@@ -216,11 +216,18 @@ def run_p2p(
         start_pick = pair.start_pick or (pair.start.candidates[: snap_cfg.k_inject] if pair.start else [])
         end_pick = pair.end_pick or (pair.end.candidates[: snap_cfg.k_inject] if pair.end else [])
 
-        # base "keys" that will be inserted into the graph:
-        # use the nudged/normalized point (p_used_ll) instead of raw input.
-        # Otherwise A* will fail with "Source ... is not in G".
-        start_key = (float(pair.start.p_used_ll[0]), float(pair.start.p_used_ll[1]))
-        end_key = (float(pair.end.p_used_ll[0]), float(pair.end.p_used_ll[1]))
+        
+        # base query node ids that will be inserted into the graph:
+        # We inject two virtual query nodes into the graph so A* keys are always stable.
+        start_id = "Q:START"
+        end_id = "Q:END"
+
+        start_ll_used = (float(pair.start.p_used_ll[0]), float(pair.start.p_used_ll[1]))
+        end_ll_used = (float(pair.end.p_used_ll[0]), float(pair.end.p_used_ll[1]))
+
+        # persist used lonlat for final polyline assembly
+        res.start_ll_used = start_ll_used
+        res.end_ll_used = end_ll_used
 
         # nearest picked graph node (for debug / viz)
         start_snap = (float(start_pick[0].node_ll[0]), float(start_pick[0].node_ll[1])) if start_pick else None
@@ -232,21 +239,18 @@ def run_p2p(
 
         if run_cfg.debug:
             print(
-                f"[pipeline][snap] start_in={origin_ll} used={start_key} -> pick={start_snap} | "
-                f"end_in={dest_ll} used={end_key} -> pick={end_snap} | {res.snap_debug}"
+                f"[pipeline][snap] start_in={origin_ll} used={start_ll_used} -> pick={start_snap} | "
+                f"end_in={dest_ll} used={end_ll_used} -> pick={end_snap} | {res.snap_debug}"
             )
 
         if not start_pick or not end_pick:
             res.error = "snap_failed"
             return res
 
-        # inject (IMPORTANT: inject using the same node keys we will use for A*)
-        inject_point_edges(G, start_key, start_pick, k_inject=snap_cfg.k_inject, etype="inject")
-        inject_point_edges(G, end_key, end_pick, k_inject=snap_cfg.k_inject, etype="inject")
+        # inject (IMPORTANT: inject using node_id keys for A*)
+        inject_point_edges(G, start_id, start_ll_used, start_pick, k_inject=snap_cfg.k_inject, etype="inject")
+        inject_point_edges(G, end_id, end_ll_used, end_pick, k_inject=snap_cfg.k_inject, etype="inject")
 
-        # overwrite the keys for downstream A*
-        origin_ll = start_key
-        dest_ll = end_key
 
     except Exception as e:
         res.error = f"snap_inject_error: {e}"
@@ -254,25 +258,45 @@ def run_p2p(
 
     # A*
     try:
+        def _node_ll(n):
+            # Prefer node attrs (covers ring nodes and sea nodes)
+            if n in G.nodes:
+                nd = G.nodes[n]
+                if isinstance(nd, dict) and "lon" in nd and "lat" in nd:
+                    return (float(nd["lon"]), float(nd["lat"]))
+            # Fallback: parse node_id encoding "...lon,lat"
+            s = str(n)
+            if ":" in s:
+                s2 = s.split(":", 1)[1]
+            else:
+                s2 = s
+            if "," in s2:
+                a, b = s2.split(",", 1)
+                try:
+                    return (float(a), float(b))
+                except Exception:
+                    pass
+            raise KeyError(f"cannot get lon/lat for node {n}")
+
         path_nodes = nx.astar_path(
             G,
-            start_key,
-            end_key,
-            heuristic=lambda a, b: haversine_km(a, b),
+            start_id,
+            end_id,
+            heuristic=lambda a, b: haversine_km(_node_ll(a), _node_ll(b)),
             weight="weight",
         )
         if run_cfg.debug:
-            print("[pipeline][astar] start_key in G?", start_key in G)
-            print("[pipeline][astar] end_key in G?", end_key in G)
+            print("[pipeline][astar] start_id in G?", start_id in G)
+            print("[pipeline][astar] end_id in G?", end_id in G)
         res.path_nodes = list(path_nodes)
-        res.path_ll_raw = [(float(p[0]), float(p[1])) for p in path_nodes]
+        res.path_ll_raw = [_node_ll(n) for n in path_nodes]
         if run_cfg.debug:
             print(f"[pipeline][A*] n_nodes={len(path_nodes)}")
     except Exception as e:
         res.error = f"astar_error: {e}"
         return res
 
-    # repair
+# repair
     path_ll_work = res.path_ll_raw
     if run_cfg.do_repair and repair_cfg is not None and collision_m is not None:
         try:
@@ -316,9 +340,8 @@ def run_p2p(
 
     origin_in = res.origin_ll  # original user input
     dest_in = res.dest_ll      # original user input
-
-    start_used = start_key     # injected key (p_used_ll)
-    end_used = end_key         # injected key (p_used_ll)
+    start_used = getattr(res, 'start_ll_used', None)  # injected query node lonlat
+    end_used = getattr(res, 'end_ll_used', None)      # injected query node lonlat
 
     def _push(pt: LonLat):
         pt2 = (float(pt[0]), float(pt[1]))

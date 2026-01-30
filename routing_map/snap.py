@@ -11,6 +11,7 @@ from shapely.prepared import prep
 from shapely.ops import nearest_points
 
 from .routing_graph import haversine_km
+from .geom_utils import wrap_lon, unwrap_lon as _unwrap_lon_ref, coord_id
 
 LonLat = Tuple[float, float]
 
@@ -19,21 +20,13 @@ LonLat = Tuple[float, float]
 # Small utilities
 # -------------------------
 def normalize_lonlat(p: LonLat) -> LonLat:
-    """Normalize lon into [-180,180] range."""
+    """Normalize lon into [-180,180) range."""
     lon, lat = float(p[0]), float(p[1])
-    lon = (lon + 180.0) % 360.0 - 180.0
-    return (lon, lat)
+    return (wrap_lon(lon), float(lat))
 
 
 def unwrap_lon(lon: float, ref_lon: float) -> float:
-    lon = float(lon)
-    ref_lon = float(ref_lon)
-    d = lon - ref_lon
-    if d > 180.0:
-        lon -= 360.0
-    if d < -180.0:
-        lon += 360.0
-    return lon
+    return float(_unwrap_lon_ref(float(lon), float(ref_lon)))
 
 
 def bearing_deg(a: LonLat, b: LonLat) -> float:
@@ -269,14 +262,15 @@ def _virtual_candidates_from_seed_node(
 
                 d_km = float(haversine_km(p_used_ll, p_ll))
                 cand = SnapCandidate(
-                    node_idx=int(vid),
+                    node_id=coord_id(p_ll[0], p_ll[1], prefix="SV:"),
+                    node_idx=None,
                     node_ll=(float(p_ll[0]), float(p_ll[1])),
                     dist_km=d_km,
                     component=(int(component) if component is not None else None),
                     ok=True,
                 )
                 # attach bridge endpoints so inject can connect it back to the sea graph
-                cand._virtual_bridge = {"u_ll": a_ll, "v_ll": b_ll}
+                cand._virtual_bridge = {"u_ll": a_ll, "v_ll": b_ll, "u_id": coord_id(a_ll[0], a_ll[1], prefix="S:"), "v_id": coord_id(b_ll[0], b_ll[1], prefix="S:")}
                 out_cands.append(cand)
                 vid -= 1
             except Exception:
@@ -388,7 +382,8 @@ def nudge_to_nearest_coastal_node(
 # -------------------------
 @dataclass
 class SnapCandidate:
-    node_idx: int
+    node_id: str
+    node_idx: Optional[int]
     node_ll: LonLat
     dist_km: float
     component: Optional[int]
@@ -574,7 +569,8 @@ def _sea_first_candidates(
         ok = True
         if isinstance(sea_ok_set, set):
             ok = (int(i) in sea_ok_set)
-        return SnapCandidate(node_idx=int(i), node_ll=ll, dist_km=dist, component=comp, ok=ok)
+        return SnapCandidate(node_id=(str(S_nodes.loc[int(i), 'node_id']) if isinstance(S_nodes, pd.DataFrame) and 'node_id' in S_nodes.columns and int(i) in S_nodes.index else coord_id(ll[0], ll[1], prefix='S:')),
+                           node_idx=int(i), node_ll=ll, dist_km=dist, component=comp, ok=ok)
 
     cands_all: List[SnapCandidate] = [make_candidate(i) for i in idxs]
     cands_all.sort(key=lambda c: c.dist_km)
@@ -1079,6 +1075,7 @@ def snap_pair_component_aware(
 # -------------------------
 def inject_point_edges(
     G,
+    p_id: str,
     p_ll: LonLat,
     candidates: Sequence[SnapCandidate],
     *,
@@ -1086,42 +1083,48 @@ def inject_point_edges(
     etype: str = "inject",
     weight_attr: str = "weight",
 ):
-    """
-    Inject p_ll into graph by adding edges to top-k candidates.
-    Also, if a candidate is a virtual point sampled on a sea edge, connect it back to the sea graph:
-      virtual <-> u_ll, virtual <-> v_ll
+    """Inject a query point into the graph using node_id keys.
+
+    - Adds node `p_id` with lon/lat attrs.
+    - Adds edges from `p_id` to top-k candidate nodes.
+    - If a candidate is a virtual point (has `_virtual_bridge`), also connects that
+      virtual node back to the sea graph endpoints (by node_id).
     """
     p_ll = normalize_lonlat(p_ll)
     if not hasattr(G, "add_edge"):
         raise TypeError("G must be a networkx-like graph with add_edge.")
 
+    # Ensure query node exists with attrs
+    if hasattr(G, "add_node"):
+        G.add_node(str(p_id), lon=float(p_ll[0]), lat=float(p_ll[1]), kind="query")
+
     use = list(candidates)[: max(1, int(k_inject))]
     for c in use:
-        v = (float(c.node_ll[0]), float(c.node_ll[1]))
+        u = str(p_id)
+        v = str(c.node_id)
+
+        # Ensure candidate node exists with attrs (best-effort)
+        if hasattr(G, "add_node") and (v not in G):
+            G.add_node(v, lon=float(c.node_ll[0]), lat=float(c.node_ll[1]), kind="candidate")
+
+        w = float(haversine_km(p_ll, c.node_ll))
+        G.add_edge(u, v, **{weight_attr: w, "length_km": w, "etype": etype})
 
         # If virtual: connect it back to sea graph so A* can traverse it
         bridge = getattr(c, "_virtual_bridge", None)
-        if isinstance(bridge, dict) and "u_ll" in bridge and "v_ll" in bridge:
-            u_ll = (float(bridge["u_ll"][0]), float(bridge["u_ll"][1]))
-            w_ll = (float(bridge["v_ll"][0]), float(bridge["v_ll"][1]))
+        if isinstance(bridge, dict) and "u_id" in bridge and "v_id" in bridge:
+            vu = str(bridge["u_id"])
+            vv = str(bridge["v_id"])
+            u_ll = tuple(map(float, bridge.get("u_ll", c.node_ll)))
+            v_ll = tuple(map(float, bridge.get("v_ll", c.node_ll)))
 
             # connect virtual -> endpoints (weights in km)
-            w1 = float(haversine_km(v, u_ll))
-            w2 = float(haversine_km(v, w_ll))
-            G.add_edge(v, u_ll, **{weight_attr: w1, "etype": "sea_virtual"})
-            G.add_edge(v, w_ll, **{weight_attr: w2, "etype": "sea_virtual"})
-
-        # Finally inject from point to candidate
-        w = float(haversine_km(p_ll, v))
-        G.add_edge(p_ll, v, **{weight_attr: w, "etype": etype, "inject": True})
-
-    return len(use)
+            w1 = float(haversine_km(c.node_ll, u_ll))
+            w2 = float(haversine_km(c.node_ll, v_ll))
+            G.add_edge(v, vu, **{weight_attr: w1, "length_km": w1, "etype": "sea_virtual"})
+            G.add_edge(v, vv, **{weight_attr: w2, "length_km": w2, "etype": "sea_virtual"})
 
 
-
-# ============================================================
-# Multi-world snapping (Ring world vs Sea world)
-# ============================================================
 
 def _get_ring_nodes(out: Dict[str, Any]) -> Tuple[Optional[pd.DataFrame], Optional[pd.DataFrame]]:
     rg = out.get("ring_graph", {}) or {}
@@ -1294,7 +1297,8 @@ def snap_to_ring_candidates(
                 dist_km = float(haversine_km(p_ll0, ll))
 
             node_idx = int(row["node_id"]) if "node_id" in chosen_df.columns else int(i)
-            cands.append(SnapCandidate(node_idx=node_idx, node_ll=ll, dist_km=dist_km, component=None, ok=True))
+            node_key = str(row['node_key']) if 'node_key' in chosen_df.columns else f"{chosen_tag}:{int(row['node_id'])}"
+            cands.append(SnapCandidate(node_id=node_key, node_idx=int(node_idx), node_ll=ll, dist_km=dist_km, component=None, ok=True))
         except Exception:
             continue
 
