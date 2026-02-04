@@ -14,6 +14,9 @@ Edges store:
 - weight (km)
 - length_km (km)
 - etype (string)
+- layer_mask (bitmask)
+- ban_mask (bitmask)
+- lat_max_abs (float)
 """
 
 from dataclasses import dataclass
@@ -27,6 +30,69 @@ from .geom_utils import coord_id, wrap_lon
 
 
 LonLat = Tuple[float, float]
+# -------------------------
+# Edge layer / ban masks (bitmask)
+# -------------------------
+
+# Layer bits: an edge can belong to multiple layers (OR together).
+L_BASE_SEA      = 1 << 0  # normal sea edges
+L_RING_E        = 1 << 1  # E-ring edges
+L_RING_T        = 1 << 2  # T-ring edges
+L_ET_TRANSFER   = 1 << 3  # E<->T transfer edges
+L_TGATE_SEA     = 1 << 4  # T-gate -> sea connectors
+L_GATEWAY       = 1 << 5  # reserved: canals/straits corridors (Suez/Panama/etc.)
+L_NE_CORRIDOR   = 1 << 6  # reserved: Northeast / NSR corridors
+L_NW_CORRIDOR   = 1 << 7  # reserved: Northwest corridors
+L_INJECT        = 1 << 8  # injected query edges (Q:START/Q:END -> picks)
+
+# Ban bits: edge carries "potential ban reasons". Policy chooses which bans are active.
+B_HIGH_LAT      = 1 << 0  # max(|lat_u|,|lat_v|) > hard cap
+B_ECA           = 1 << 1  # reserved: Emission Control Areas
+B_ICE           = 1 << 2  # reserved: ice/seasonal restrictions
+B_SHALLOW       = 1 << 3  # reserved: bathymetry/draft limits
+B_TSS           = 1 << 4  # reserved: traffic separation schemes
+B_USER_NO_GO    = 1 << 5  # reserved: user-defined no-go polygons
+
+
+def infer_layer_mask_from_etype(etype: str) -> int:
+    """Best-effort mapping from `etype` to layer bits.
+    Unknown types fall back to `L_BASE_SEA`.
+    """
+    e = (etype or "").upper()
+    if e in ("E_RING", "E-RING"):
+        return L_RING_E
+    if e in ("T_RING", "T-RING"):
+        return L_RING_T
+    if e in ("E_T", "ET", "E_T_RAMP", "E_T_TRANSFER"):
+        return L_ET_TRANSFER
+    if e in ("T_S_GATE", "TGATE_SEA", "T_GATE_SEA", "T_S"):
+        return L_TGATE_SEA
+    if e in ("INJECT",):
+        return L_INJECT
+    # default: treat as base sea
+    return L_BASE_SEA
+
+
+def edge_lat_max_abs(G: nx.Graph, u: str, v: str) -> Optional[float]:
+    """Return max(|lat_u|, |lat_v|) if node attrs exist."""
+    try:
+        lat_u = float(G.nodes[u].get("lat"))
+        lat_v = float(G.nodes[v].get("lat"))
+        return float(max(abs(lat_u), abs(lat_v)))
+    except Exception:
+        return None
+
+
+def compute_edge_masks(G: nx.Graph, u: str, v: str, *, etype: str, hard_lat_cap_deg: float = 70.0) -> Tuple[int, int, Optional[float]]:
+    """Compute (layer_mask, ban_mask, lat_max_abs) for an edge."""
+    layer = infer_layer_mask_from_etype(etype)
+    lat_max = edge_lat_max_abs(G, u, v)
+    ban = 0
+    if lat_max is not None and float(lat_max) > float(hard_lat_cap_deg):
+        ban |= B_HIGH_LAT
+    return int(layer), int(ban), (float(lat_max) if lat_max is not None else None)
+
+
 
 
 # -------------------------
@@ -100,6 +166,7 @@ def build_base_graph(
     max_ring_edges: Optional[int] = None,
     weight_unit: str="km",
     bbox_ll: Optional[Tuple[float, float, float, float]] = None,
+    hard_lat_cap_deg: float = 70.0,
 ) -> Tuple[nx.Graph, GraphBuildStats]:
     """Assemble a NetworkX undirected graph from `out` using node_id keys."""
 
@@ -138,7 +205,8 @@ def build_base_graph(
                 u = coord_id(a_ll[0], a_ll[1], prefix="S:")
                 v = coord_id(b_ll[0], b_ll[1], prefix="S:")
                 w = haversine_km(a_ll, b_ll)
-                G.add_edge(u, v, weight=w, length_km=w, etype="sea")
+                layer, ban, lat_max = compute_edge_masks(G, u, v, etype="sea", hard_lat_cap_deg=hard_lat_cap_deg)
+                G.add_edge(u, v, weight=w, length_km=w, etype="sea", layer_mask=layer, ban_mask=ban, lat_max_abs=lat_max)
                 stats.sea_edges_added += 1
 
     # -------- Ring nodes + edges (E/T) --------
@@ -196,7 +264,8 @@ def build_base_graph(
                         w = haversine_km(a_ll, b_ll)
                     else:
                         continue
-                G.add_edge(u, v, weight=w, length_km=w, etype=etype)
+                layer, ban, lat_max = compute_edge_masks(G, u, v, etype=str(etype), hard_lat_cap_deg=hard_lat_cap_deg)
+                G.add_edge(u, v, weight=w, length_km=w, etype=etype, layer_mask=layer, ban_mask=ban, lat_max_abs=lat_max)
                 setattr(stats, counter_attr, getattr(stats, counter_attr) + 1)
 
         _add_ring_edges(E_edges, "E", "E_RING", "e_edges_added")
@@ -230,7 +299,8 @@ def build_base_graph(
                 if w is None:
                     continue
                 etype = str(getattr(r, "etype")) if hasattr(r, "etype") else "E_T"
-                G.add_edge(u, v, weight=w, length_km=w, etype=etype)
+                layer, ban, lat_max = compute_edge_masks(G, u, v, etype=str(etype), hard_lat_cap_deg=hard_lat_cap_deg)
+                G.add_edge(u, v, weight=w, length_km=w, etype=etype, layer_mask=layer, ban_mask=ban, lat_max_abs=lat_max)
                 stats.et_edges_added += 1
 
     # -------- T-gate -> Sea connectors --------
@@ -263,7 +333,8 @@ def build_base_graph(
                     else:
                         continue
                 etype = str(getattr(r, "etype")) if hasattr(r, "etype") else "T_S_GATE"
-                G.add_edge(u, v, weight=w, length_km=w, etype=etype)
+                layer, ban, lat_max = compute_edge_masks(G, u, v, etype=str(etype), hard_lat_cap_deg=hard_lat_cap_deg)
+                G.add_edge(u, v, weight=w, length_km=w, etype=etype, layer_mask=layer, ban_mask=ban, lat_max_abs=lat_max)
                 stats.tgate_sea_edges_added += 1
 
     return G, stats

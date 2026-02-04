@@ -188,7 +188,8 @@ def add_points_layer(
         p = (float(lon), float(lat))
         if not _in_bbox(p, bbox_ll):
             continue
-        folium.CircleMarker([p[1], _lon_viz(p[0], bbox_ll)], radius=int(radius)).add_to(fg)
+        lon_v = _lon_viz_point(p[0], bbox_ll, m)
+        folium.CircleMarker([p[1], lon_v], radius=int(radius)).add_to(fg)
     fg.add_to(m)
 
 
@@ -284,6 +285,108 @@ def _densify_polyline_gc_ll(path_ll: Sequence[LonLat], *, step_km: float = 20.0)
         out.extend(seg)
     return out
 
+def _split_polyline_at_antimeridian_ll(path_ll: Sequence[LonLat]) -> List[List[LonLat]]:
+    """
+    Split a polyline into multiple segments so that no segment crosses the antimeridian.
+    This avoids Leaflet drawing a huge 360°-wrapping line when lon jumps (e.g. 170 -> -170).
+    """
+    if not path_ll or len(path_ll) < 2:
+        return [list(path_ll)] if path_ll else []
+
+    seg: List[LonLat] = [ (float(path_ll[0][0]), float(path_ll[0][1])) ]
+    out: List[List[LonLat]] = []
+
+    for (lon1, lat1), (lon2, lat2) in zip(path_ll, path_ll[1:]):
+        lon1, lat1 = float(lon1), float(lat1)
+        lon2, lat2 = float(lon2), float(lat2)
+        d = lon2 - lon1
+
+        if abs(d) <= 180.0:
+            seg.append((lon2, lat2))
+            continue
+
+        # We need to split at +/-180.
+        if d > 180.0:
+            # Example: lon1=-170 -> lon2=+170 (jump +340). Short way crosses -180.
+            lon2_adj = lon2 - 360.0  # make it continuous going "left"
+            # interpolate where lon hits -180
+            f = (-180.0 - lon1) / (lon2_adj - lon1)
+            latc = lat1 + f * (lat2 - lat1)
+
+            seg.append((-180.0, float(latc)))
+            out.append(seg)
+
+            seg = [(180.0, float(latc)), (lon2, lat2)]
+        else:
+            # Example: lon1=+170 -> lon2=-170 (jump -340). Short way crosses +180.
+            lon2_adj = lon2 + 360.0  # make it continuous going "right"
+            # interpolate where lon hits +180
+            f = (180.0 - lon1) / (lon2_adj - lon1)
+            latc = lat1 + f * (lat2 - lat1)
+
+            seg.append((180.0, float(latc)))
+            out.append(seg)
+
+            seg = [(-180.0, float(latc)), (lon2, lat2)]
+
+    out.append(seg)
+    return out
+
+def _unwrap_polyline_lon_ll(path_ll: Sequence[LonLat]) -> List[LonLat]:
+    """Make lon sequence continuous by adding/subtracting 360 when needed."""
+    if not path_ll:
+        return []
+    out = [(float(path_ll[0][0]), float(path_ll[0][1]))]
+    prev = out[0][0]
+    for lon, lat in path_ll[1:]:
+        lon = float(lon); lat = float(lat)
+        # shift lon by multiples of 360 so it's closest to prev
+        while lon - prev > 180.0:
+            lon -= 360.0
+        while lon - prev < -180.0:
+            lon += 360.0
+        out.append((lon, lat))
+        prev = lon
+    return out
+
+def _lon_to_near_ref(lon: float, ref_lon: float) -> float:
+    """Shift lon by multiples of 360 so it's closest to ref_lon."""
+    x = float(lon)
+    ref = float(ref_lon)
+    while x - ref > 180.0:
+        x -= 360.0
+    while x - ref < -180.0:
+        x += 360.0
+    return x
+
+def _lon_viz_point(lon: float, bbox_ll: Optional[BBoxLL], m: Optional[folium.Map] = None) -> float:
+    """Pick a visualization longitude consistent with the currently drawn path (if any)."""
+    x0 = float(lon)
+
+    # If bbox itself crosses the dateline, the existing bbox-based rule is enough.
+    if DATELINE_VIZ_MODE == "unwrap360" and _bbox_crosses_dateline(bbox_ll):
+        return _lon_viz(x0, bbox_ll)
+
+    # Otherwise, if a path has already been drawn in an unwrapped world copy, align points to it.
+    if DATELINE_VIZ_MODE == "unwrap360" and m is not None:
+        refs = []
+        for k in ("_routing_viz_ref_lon_start", "_routing_viz_ref_lon_end"):
+            if hasattr(m, k):
+                try:
+                    refs.append(float(getattr(m, k)))
+                except Exception:
+                    pass
+        if refs:
+            cands = []
+            for r in refs:
+                xr = _lon_to_near_ref(x0, r)
+                cands.append((abs(xr - r), xr))
+            cands.sort(key=lambda t: t[0])
+            return cands[0][1]
+
+    return x0
+
+
 def add_path_layer(
     m: folium.Map,
     path_ll: Sequence[LonLat],
@@ -305,12 +408,40 @@ def add_path_layer(
     # Leaflet draws straight segments in (WebMercator) map space. If you want the path
     # to *look* like a great-circle, we densify each segment along the great-circle
     # before drawing (purely for visualization; this does not change routing).
-    pts_ll_viz = [(_lon_viz(float(lon), bbox_ll), float(lat)) for (lon, lat) in path_ll]
-    if geodesic:
-        pts_ll_viz = _densify_polyline_gc_ll(pts_ll_viz, step_km=float(geodesic_step_km))
+    
+    # Case 1: bbox crosses dateline AND unwrap360 mode -> keep your existing "single-world copy" behavior
+    if bbox_ll is not None and DATELINE_VIZ_MODE == "unwrap360" and _bbox_crosses_dateline(bbox_ll):
+        pts_ll_viz = [(_lon_viz(float(lon), bbox_ll), float(lat)) for (lon, lat) in path_ll]
+        if geodesic:
+            pts_ll_viz = _densify_polyline_gc_ll(pts_ll_viz, step_km=float(geodesic_step_km))
+        folium.PolyLine([[lat, lon] for (lon, lat) in pts_ll_viz],
+                    color="red", weight=int(weight), opacity=float(opacity)).add_to(fg)
 
-    folium.PolyLine([[lat, lon] for (lon, lat) in pts_ll_viz], color="red", weight=int(weight), opacity=float(opacity)).add_to(fg)
+    # Case 2: bbox does NOT cross dateline (e.g. global bbox) -> split the path itself at the antimeridian
+    else:
+        # Global bbox / non-dateline bbox case:
+        # Draw as a single continuous polyline by unwrapping lon sequence (no split).
+        pts = _unwrap_polyline_lon_ll(path_ll)
+
+        if geodesic:
+            pts = _densify_polyline_gc_ll(pts, step_km=float(geodesic_step_km))
+
+        # Save a reference so point markers can be shifted into the same world copy.
+        try:
+            if pts:
+                setattr(m, "_routing_viz_ref_lon_start", float(pts[0][0]))
+                setattr(m, "_routing_viz_ref_lon_end", float(pts[-1][0]))
+        except Exception:
+            pass
+
+        # NOTE: do NOT split; just draw the unwrapped lon directly.
+        # Leaflet can render lon outside [-180, 180] as a different world copy.
+        folium.PolyLine([[lat, lon] for (lon, lat) in pts],
+                        color="red", weight=int(weight), opacity=float(opacity)).add_to(fg)
+
+
     fg.add_to(m)
+
 
 def add_sea_layers(
     m: folium.Map,

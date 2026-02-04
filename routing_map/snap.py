@@ -10,7 +10,7 @@ from shapely.geometry import Point
 from shapely.prepared import prep
 from shapely.ops import nearest_points
 
-from .routing_graph import haversine_km
+from .routing_graph import haversine_km, L_INJECT, B_HIGH_LAT
 from .geom_utils import wrap_lon, unwrap_lon as _unwrap_lon_ref, coord_id
 
 LonLat = Tuple[float, float]
@@ -1108,7 +1108,9 @@ def inject_point_edges(
             G.add_node(v, lon=float(c.node_ll[0]), lat=float(c.node_ll[1]), kind="candidate")
 
         w = float(haversine_km(p_ll, c.node_ll))
-        G.add_edge(u, v, **{weight_attr: w, "length_km": w, "etype": etype})
+        lat_max = float(max(abs(float(p_ll[1])), abs(float(c.node_ll[1]))))
+        ban = int(B_HIGH_LAT) if lat_max > 70.0 else 0
+        G.add_edge(u, v, **{weight_attr: w, "length_km": w, "etype": etype, "layer_mask": int(L_INJECT), "ban_mask": ban, "lat_max_abs": lat_max})
 
         # If virtual: connect it back to sea graph so A* can traverse it
         bridge = getattr(c, "_virtual_bridge", None)

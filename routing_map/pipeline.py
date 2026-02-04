@@ -5,7 +5,12 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import networkx as nx
 
-from .routing_graph import build_base_graph, haversine_km
+from .routing_graph import (
+    build_base_graph, haversine_km,
+    infer_layer_mask_from_etype,
+    L_BASE_SEA, L_RING_E, L_RING_T, L_ET_TRANSFER, L_TGATE_SEA, L_GATEWAY, L_NE_CORRIDOR, L_NW_CORRIDOR, L_INJECT,
+    B_HIGH_LAT,
+)
 from .snap import snap_pair_component_aware, inject_point_edges
 from .repairer import PathRepairer, RepairConfig
 from .path_simplifier import simplify_path_visibility
@@ -13,6 +18,82 @@ from .geom_utils import get_projector, get_collision_metric
 
 LonLat = Tuple[float, float]
 BBoxLL = Tuple[float, float, float, float]
+
+
+
+@dataclass
+class RoutePolicy:
+    """Runtime routing policy.
+
+    This is designed to mirror a future UI:
+    - layer toggles: enable/disable certain classes of edges (NE/NW corridors, gateways, etc.)
+    - ban toggles: activate certain ban reasons (high-lat cap now; ECA/ice/etc later)
+    """
+
+    # Hard operational cap (for now: global merchant shipping default)
+    hard_lat_cap_deg: float = 70.0
+
+    # Layer toggles (future UI switches)
+    enable_gateways: bool = True      # canals/straits corridors (reserved)
+    enable_northeast: bool = False    # NSR/NE corridor (reserved)
+    enable_northwest: bool = False    # NWP/NW corridor (reserved)
+
+    # Which ban reasons are enforced right now
+    active_ban_mask: int = B_HIGH_LAT
+
+    def enabled_layers_mask(self) -> int:
+        m = (L_BASE_SEA | L_RING_E | L_RING_T | L_ET_TRANSFER | L_TGATE_SEA | L_INJECT)
+        if self.enable_gateways:
+            m |= L_GATEWAY
+        if self.enable_northeast:
+            m |= L_NE_CORRIDOR
+        if self.enable_northwest:
+            m |= L_NW_CORRIDOR
+        return int(m)
+
+
+def apply_policy_view(G: nx.Graph, policy: RoutePolicy) -> nx.Graph:
+    """Return a *view* of G with edges filtered by the policy (no up-front copy cost)."""
+    enabled_layers = int(policy.enabled_layers_mask())
+    active_bans = int(policy.active_ban_mask)
+    hard_lat = float(policy.hard_lat_cap_deg)
+
+    def _edge_ok(u: Any, v: Any) -> bool:
+        try:
+            attr = G.get_edge_data(u, v) or {}
+        except Exception:
+            return False
+
+        # layer
+        layer = int(attr.get("layer_mask") or 0)
+        if layer == 0:
+            layer = int(infer_layer_mask_from_etype(str(attr.get("etype", ""))))
+
+        # lat cap (prefer cached attr; fallback to node attrs)
+        lat_max = attr.get("lat_max_abs", None)
+        if lat_max is None:
+            try:
+                lat_max = max(abs(float(G.nodes[u].get("lat"))), abs(float(G.nodes[v].get("lat"))))
+            except Exception:
+                lat_max = None
+
+        ban = int(attr.get("ban_mask") or 0)
+        if lat_max is not None and float(lat_max) > hard_lat:
+            ban |= B_HIGH_LAT
+
+        if (layer & enabled_layers) == 0:
+            return False
+        if (ban & active_bans) != 0:
+            return False
+
+        # final hard safety check (even if bans are disabled accidentally)
+        if lat_max is not None and float(lat_max) > hard_lat:
+            return False
+
+        return True
+
+    return nx.subgraph_view(G, filter_edge=_edge_ok)
+
 
 
 @dataclass
@@ -125,6 +206,7 @@ def run_p2p(
     simplify_cfg: Optional[SimplifyConfig] = None,
     run_cfg: Optional[RunConfig] = None,
     G_in: Optional[Any] = None,
+    policy: Optional[RoutePolicy] = None,
 ) -> RouteResult:
     """End-to-end routing runner for the new Sea + E/T ring graph.
 
@@ -139,6 +221,7 @@ def run_p2p(
     simplify_cfg = simplify_cfg or SimplifyConfig()
     run_cfg = run_cfg or RunConfig()
 
+    policy = policy or RoutePolicy()
     res = RouteResult(origin_ll=origin_ll, dest_ll=dest_ll)
 
     bbox_ll = graph_cfg.bbox_ll or out.get("bbox_ll")
@@ -169,6 +252,7 @@ def run_p2p(
                 max_ring_edges=graph_cfg.max_ring_edges,
                 weight_unit=graph_cfg.weight_unit,
                 bbox_ll=bbox_ll,
+                hard_lat_cap_deg=policy.hard_lat_cap_deg,
             )
         res.G = G
         res.graph_stats = stats
@@ -278,8 +362,10 @@ def run_p2p(
                     pass
             raise KeyError(f"cannot get lon/lat for node {n}")
 
+        G_view = apply_policy_view(G, policy)
+
         path_nodes = nx.astar_path(
-            G,
+            G_view,
             start_id,
             end_id,
             heuristic=lambda a, b: haversine_km(_node_ll(a), _node_ll(b)),
@@ -388,6 +474,8 @@ def run_p2p_multiworld(
     repair_cfg: Optional[RepairConfig] = None,
     simplify_cfg: Optional[SimplifyConfig] = None,
     run_cfg: Optional[RunConfig] = None,
+    G_in: Optional[nx.Graph] = None,
+    policy: Optional[RoutePolicy] = None,
 ) -> RouteResult:
     """
     Multi-worldview runner:
@@ -402,6 +490,7 @@ def run_p2p_multiworld(
     simplify_cfg = simplify_cfg or SimplifyConfig()
     run_cfg = run_cfg or RunConfig()
 
+    policy = policy or RoutePolicy()
     bbox_ll = graph_cfg.bbox_ll or out.get("bbox_ll")
 
     # --- projector + collision (for "in_collision" pruning safety) ---
@@ -414,20 +503,25 @@ def run_p2p_multiworld(
 
     # --- build base graph ONCE ---
     try:
-        G_base, stats = build_base_graph(
-            out,
-            include_sea=graph_cfg.include_sea,
-            include_cc=graph_cfg.include_cc,
-            include_gateb_sea=graph_cfg.include_gateb_sea,
-            include_c_gateb=graph_cfg.include_c_gateb,
-            include_rings=graph_cfg.include_rings,
-            include_et=graph_cfg.include_et,
-            include_tgate_sea=graph_cfg.include_tgate_sea,
-            max_sea_edges=graph_cfg.max_sea_edges,
-            max_ring_edges=graph_cfg.max_ring_edges,
-            weight_unit=graph_cfg.weight_unit,
-            bbox_ll=bbox_ll,
-        )
+        if G_in is not None:
+            G_base, stats = G_in, None
+        else:
+            G_base, stats = build_base_graph(
+                out,
+                include_sea=graph_cfg.include_sea,
+                include_cc=graph_cfg.include_cc,
+                include_gateb_sea=graph_cfg.include_gateb_sea,
+                include_c_gateb=graph_cfg.include_c_gateb,
+                include_rings=graph_cfg.include_rings,
+                include_et=graph_cfg.include_et,
+                include_tgate_sea=graph_cfg.include_tgate_sea,
+                max_sea_edges=graph_cfg.max_sea_edges,
+                max_ring_edges=graph_cfg.max_ring_edges,
+                weight_unit=graph_cfg.weight_unit,
+                bbox_ll=bbox_ll,
+                hard_lat_cap_deg=policy.hard_lat_cap_deg,
+            )
+
         if run_cfg.debug:
             try:
                 print(f"[pipeline][graph] nodes={G_base.number_of_nodes()} edges={G_base.number_of_edges()} stats={stats}")
@@ -563,6 +657,7 @@ def run_p2p_multiworld(
                 max_ring_edges=graph_cfg.max_ring_edges,
                 weight_unit=graph_cfg.weight_unit,
                 bbox_ll=bbox_ll,
+                hard_lat_cap_deg=policy.hard_lat_cap_deg,
             )
 
         snap_cfg_run = replace(snap_cfg, force_start_policy=sp, force_end_policy=ep)

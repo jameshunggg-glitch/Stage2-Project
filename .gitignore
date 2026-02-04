@@ -32,3 +32,14 @@ lake/**
 **/*.parquet
 **/*.pkl
 **/*.pickle
+
+# ---- AOI cache ----
+aoi_cache/
+aoi_cache/**
+
+# ---- gzipped pickle ----
+*.pkl.gz
+*.pickle.gz
+
+# --- Large files / notebooks you don't want in git ---
+251230_routing_net.ipynb
