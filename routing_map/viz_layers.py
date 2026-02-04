@@ -165,12 +165,25 @@ def make_base_map(bbox_ll: BBoxLL, *, zoom_start: int = 5, control_scale: bool =
     setattr(m, "_routing_bbox_ll", tuple(map(float, bbox_ll)))
 
     if DATELINE_VIZ_MODE == "unwrap360" and crosses:
-        folium.Rectangle(bounds=[[v_min_lat, v_min_lon], [v_max_lat, v_max_lon]], fill=False, weight=3, opacity=0.9, color="blue").add_to(m)
+        # === AOI bbox (debug) ===
+        # folium.Rectangle(
+        #     bounds=[[v_min_lat, v_min_lon], [v_max_lat, v_max_lon]],
+        #     fill=False, weight=3, opacity=0.9, color="blue"
+        # ).add_to(m)
+
         m.fit_bounds([[v_min_lat, v_min_lon], [v_max_lat, v_max_lon]])
     else:
-        folium.Rectangle(bounds=[[min_lat, min_lon], [max_lat, max_lon]], fill=False, weight=3, opacity=0.9, color="blue").add_to(m)
+        # === AOI bbox (debug) ===
+        # folium.Rectangle(
+        #     bounds=[[min_lat, min_lon], [max_lat, max_lon]],
+        #     fill=False, weight=3, opacity=0.9, color="blue"
+        # ).add_to(m)
+
         m.fit_bounds([[min_lat, min_lon], [max_lat, max_lon]])
+
     return m
+
+
 
 def add_points_layer(
     m: folium.Map,

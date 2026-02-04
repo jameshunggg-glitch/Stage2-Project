@@ -11,7 +11,7 @@ from .routing_graph import (
     L_BASE_SEA, L_RING_E, L_RING_T, L_ET_TRANSFER, L_TGATE_SEA, L_GATEWAY, L_NE_CORRIDOR, L_NW_CORRIDOR, L_INJECT,
     B_HIGH_LAT,
 )
-from .snap import snap_pair_component_aware, inject_point_edges
+from .snap import snap_pair_component_aware, inject_point_edges, compute_multiworld_policies_for_point
 from .repairer import PathRepairer, RepairConfig
 from .path_simplifier import simplify_path_visibility
 from .geom_utils import get_projector, get_collision_metric
@@ -530,98 +530,125 @@ def run_p2p_multiworld(
     except Exception as e:
         return RouteResult(origin_ll=origin_ll, dest_ll=dest_ll, error=f"graph_build_error: {e}")
 
-    # --- helper: min distance (km) from point to node dataframe using x_m/y_m ---
-    def _min_df_dist_km(p_ll: LonLat, df) -> Optional[float]:
-        if df is None:
-            return None
-        cols = getattr(df, "columns", [])
-        if "x_m" not in cols or "y_m" not in cols:
-            return None
-        if proj is None or not hasattr(proj, "ll2m"):
-            return None
-        x0, y0 = proj.ll2m(float(p_ll[0]), float(p_ll[1]))
-
-        # Fast path with numpy if available
-        try:
-            import numpy as np  # type: ignore
-            xs = df["x_m"].to_numpy(dtype=float)
-            ys = df["y_m"].to_numpy(dtype=float)
-            if xs.size == 0:
-                return None
-            d2 = (xs - x0) ** 2 + (ys - y0) ** 2
-            return float(np.sqrt(d2.min()) / 1000.0)
-        except Exception:
-            # Pure python fallback
-            best = None
-            for r in df.itertuples(index=False):
-                try:
-                    dx = float(getattr(r, "x_m")) - x0
-                    dy = float(getattr(r, "y_m")) - y0
-                    d = (dx * dx + dy * dy) ** 0.5 / 1000.0
-                    best = d if best is None else min(best, d)
-                except Exception:
-                    continue
-            return best
-
-    def _in_collision(p_ll: LonLat) -> bool:
-        if collision_m is None or proj is None or not hasattr(proj, "ll2m"):
-            return False
-        try:
-            from shapely.geometry import Point
-            x, y = proj.ll2m(float(p_ll[0]), float(p_ll[1]))
-            return bool(collision_m.contains(Point(x, y)))
-        except Exception:
-            return False
-
-    # --- fetch node dfs (robust keys) ---
-    sea_nodes = out.get("sea_nodes", None)
-    e_nodes = out.get("e_nodes", out.get("E_nodes", None))
-    t_nodes = out.get("t_nodes", out.get("T_nodes", None))
-
-    # distances for pruning (approx via nearest nodes, good enough for pruning)
-    d_sea_o = _min_df_dist_km(origin_ll, sea_nodes)
-    d_sea_d = _min_df_dist_km(dest_ll, sea_nodes)
-
-    d_e_o = _min_df_dist_km(origin_ll, e_nodes)
-    d_t_o = _min_df_dist_km(origin_ll, t_nodes)
-    d_ring_o = min([v for v in [d_e_o, d_t_o] if v is not None], default=None)
-
-    d_e_d = _min_df_dist_km(dest_ll, e_nodes)
-    d_t_d = _min_df_dist_km(dest_ll, t_nodes)
-    d_ring_d = min([v for v in [d_e_d, d_t_d] if v is not None], default=None)
-
-    # --- pruning rules (necessary pruning only) ---
+    # --- compute pruning policies (R/S) using snap utilities (KDTree-based) ---
+    # Using compute_multiworld_policies_for_point() avoids the common situation where
+    # df-based distance estimates become None (e.g., missing x_m/y_m), which forces
+    # running all 4 combos every time.
     R_NEAR = float(getattr(snap_cfg, "R_NEAR_COAST_KM", 120.0))
-    S_MAX = float(getattr(snap_cfg, "S_MAX_SNAP_KM", 200.0))
+    S_MAX  = float(getattr(snap_cfg, "S_MAX_SNAP_KM", 200.0))
 
-    def _allowed_policies(p_ll: LonLat, d_ring: Optional[float], d_sea: Optional[float]) -> List[str]:
-        allow_R = True
-        allow_S = True
+    d_ring_o: Optional[float] = None
+    d_sea_o:  Optional[float] = None
+    d_ring_d: Optional[float] = None
+    d_sea_d:  Optional[float] = None
+    P_start: List[str] = ["R", "S"]
+    P_end:   List[str] = ["R", "S"]
 
-        # Always keep R if in collision (safety)
-        if _in_collision(p_ll):
+    try:
+        pr_o = compute_multiworld_policies_for_point(out, origin_ll, R_NEAR_COAST_KM=R_NEAR, S_MAX_SNAP_KM=S_MAX)
+        pr_d = compute_multiworld_policies_for_point(out, dest_ll,   R_NEAR_COAST_KM=R_NEAR, S_MAX_SNAP_KM=S_MAX)
+
+        # distances (km)
+        try:
+            d_ring_o = float(pr_o.get("d_ring_km"))  # type: ignore[arg-type]
+        except Exception:
+            d_ring_o = None
+        try:
+            d_sea_o  = float(pr_o.get("d_sea_km"))   # type: ignore[arg-type]
+        except Exception:
+            d_sea_o = None
+        try:
+            d_ring_d = float(pr_d.get("d_ring_km"))  # type: ignore[arg-type]
+        except Exception:
+            d_ring_d = None
+        try:
+            d_sea_d  = float(pr_d.get("d_sea_km"))   # type: ignore[arg-type]
+        except Exception:
+            d_sea_d = None
+
+        P_start = list(pr_o.get("policies", ["R", "S"])) or ["R", "S"]
+        P_end   = list(pr_d.get("policies", ["R", "S"])) or ["R", "S"]
+
+    except Exception:
+        # Fallback to legacy df-based approximation (conservative; may run more combos)
+        # NOTE: this should be rare; prefer fixing out["sea_kdt"] / ring KDTree builders.
+        # --- helper: min distance (km) from point to node dataframe using x_m/y_m ---
+        def _min_df_dist_km(p_ll: LonLat, df) -> Optional[float]:
+            if df is None:
+                return None
+            cols = getattr(df, "columns", [])
+            if "x_m" not in cols or "y_m" not in cols:
+                return None
+            if proj is None or not hasattr(proj, "ll2m"):
+                return None
+            x0, y0 = proj.ll2m(float(p_ll[0]), float(p_ll[1]))
+            try:
+                import numpy as np  # type: ignore
+                xs = df["x_m"].to_numpy(dtype=float)
+                ys = df["y_m"].to_numpy(dtype=float)
+                if xs.size == 0:
+                    return None
+                d2 = (xs - x0) ** 2 + (ys - y0) ** 2
+                return float(np.sqrt(d2.min()) / 1000.0)
+            except Exception:
+                best = None
+                for r in df.itertuples(index=False):
+                    try:
+                        dx = float(getattr(r, "x_m")) - x0
+                        dy = float(getattr(r, "y_m")) - y0
+                        d = (dx * dx + dy * dy) ** 0.5 / 1000.0
+                        best = d if best is None else min(best, d)
+                    except Exception:
+                        continue
+                return best
+
+        def _in_collision(p_ll: LonLat) -> bool:
+            if collision_m is None or proj is None or not hasattr(proj, "ll2m"):
+                return False
+            try:
+                from shapely.geometry import Point
+                x, y = proj.ll2m(float(p_ll[0]), float(p_ll[1]))
+                return bool(collision_m.contains(Point(x, y)))
+            except Exception:
+                return False
+
+        sea_nodes = out.get("sea_nodes", out.get("S_nodes", None))
+        e_nodes = out.get("e_nodes", out.get("E_nodes", None))
+        t_nodes = out.get("t_nodes", out.get("T_nodes", None))
+
+        d_sea_o = _min_df_dist_km(origin_ll, sea_nodes)
+        d_sea_d = _min_df_dist_km(dest_ll, sea_nodes)
+
+        d_e_o = _min_df_dist_km(origin_ll, e_nodes)
+        d_t_o = _min_df_dist_km(origin_ll, t_nodes)
+        d_ring_o = min([v for v in [d_e_o, d_t_o] if v is not None], default=None)
+
+        d_e_d = _min_df_dist_km(dest_ll, e_nodes)
+        d_t_d = _min_df_dist_km(dest_ll, t_nodes)
+        d_ring_d = min([v for v in [d_e_d, d_t_d] if v is not None], default=None)
+
+        # --- pruning rules (necessary pruning only) ---
+        def _allowed_policies(p_ll: LonLat, d_ring: Optional[float], d_sea: Optional[float]) -> List[str]:
             allow_R = True
-        else:
-            # If ring is far, we can prune R (but only if we can compute d_ring)
-            if d_ring is not None and d_ring > R_NEAR:
-                allow_R = False
+            allow_S = True
+            if _in_collision(p_ll):
+                allow_R = True
+            else:
+                if d_ring is not None and d_ring > R_NEAR:
+                    allow_R = False
+            if d_sea is not None and d_sea > S_MAX:
+                allow_S = False
+            out_p: List[str] = []
+            if allow_R:
+                out_p.append("R")
+            if allow_S:
+                out_p.append("S")
+            if not out_p:
+                out_p = ["R"]
+            return out_p
 
-        # If nearest sea node is too far, prune S (only if we can compute d_sea)
-        if d_sea is not None and d_sea > S_MAX:
-            allow_S = False
-
-        # Never end up with empty set: fallback to R
-        out_p = []
-        if allow_R:
-            out_p.append("R")
-        if allow_S:
-            out_p.append("S")
-        if not out_p:
-            out_p = ["R"]
-        return out_p
-
-    P_start = _allowed_policies(origin_ll, d_ring_o, d_sea_o)
-    P_end = _allowed_policies(dest_ll, d_ring_d, d_sea_d)
+        P_start = _allowed_policies(origin_ll, d_ring_o, d_sea_o)
+        P_end   = _allowed_policies(dest_ll,   d_ring_d, d_sea_d)
 
     combos: List[Tuple[str, str]] = [(a, b) for a in P_start for b in P_end]
     if run_cfg.debug:
@@ -632,7 +659,7 @@ def run_p2p_multiworld(
             f"combos={[''.join(c) for c in combos]}"
         )
 
-    # --- run each combo and select best by final length ---
+# --- run each combo and select best by final length ---
     best: Optional[RouteResult] = None
     best_len: Optional[float] = None
 

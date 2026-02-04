@@ -1352,15 +1352,27 @@ def compute_multiworld_policies_for_point(
     dT = _nearest_node_dist_km(out, T_nodes, t_kdt, p_ll0) if T_nodes is not None else float("inf")
     d_ring = float(min(dE, dT))
 
-    # sea nearest dist
+    # sea nearest dist (robust across sklearn KDTree / scipy cKDTree)
     d_sea = float("inf")
     try:
         S_nodes = out.get("S_nodes", None)
         sea_kdt = out.get("sea_kdt", None)
         if isinstance(S_nodes, pd.DataFrame) and sea_kdt is not None and len(S_nodes) > 0:
             x, y = _point_ll_to_m(out, p_ll0)
-            d, _ = sea_kdt.query([x, y], k=1)
-            d_sea = float(d) / 1000.0
+
+            # Use shared helper to tolerate KDTree API differences (shape, return types)
+            idxs = _kdt_query_indices(sea_kdt, x, y, k=1)
+            if idxs:
+                sea_idx = int(idxs[0])
+
+                # Prefer metric coords if available (fast and consistent)
+                if ("x_m" in S_nodes.columns) and ("y_m" in S_nodes.columns):
+                    sx = float(S_nodes.iloc[sea_idx]["x_m"])
+                    sy = float(S_nodes.iloc[sea_idx]["y_m"])
+                    d_sea = float(np.hypot(sx - float(x), sy - float(y)) / 1000.0)
+                else:
+                    sll = (float(S_nodes.iloc[sea_idx]["lon"]), float(S_nodes.iloc[sea_idx]["lat"]))
+                    d_sea = float(haversine_km(p_ll0, sll))
     except Exception:
         d_sea = float("inf")
 
@@ -1371,7 +1383,7 @@ def compute_multiworld_policies_for_point(
         policies.discard("R")
 
     # prune sea if too far
-    if d_sea > float(S_MAX_SNAP_KM):
+    if np.isfinite(d_sea) and d_sea > float(S_MAX_SNAP_KM):
         policies.discard("S")
 
     # always keep at least one

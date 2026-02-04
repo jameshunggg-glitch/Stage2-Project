@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Union
+import time
 
 import math
 
@@ -56,6 +57,10 @@ class RepairStats:
     fast_success: int = 0
     rb_success: int = 0
     failed_edges: int = 0
+
+    # timing (seconds)
+    prepare_sec: float = 0.0
+    total_sec: float = 0.0
 
 
 @dataclass
@@ -408,6 +413,8 @@ class PathRepairer:
 
     def __init__(self, cfg: Optional[RepairConfig] = None):
         self.cfg = cfg or RepairConfig()
+        # cache prepared collision geometry per-process
+        self._prepared_cache: Dict[int, Any] = {}
 
 
     def repair_path(
@@ -439,21 +446,27 @@ class PathRepairer:
         stats = RepairStats()
         dbg: List[Dict[str, Any]] = []
 
+        t0_total = time.perf_counter()
+
         ll2m, m2ll = _make_projectors(proj, ll_to_m=ll_to_m, m_to_ll=m_to_ll)
 
-        # collision can be prepared or raw; normalize:
-        collision_geom = getattr(collision_m, "context", None)  # prepared geom has .context in shapely<2, not always
+        # collision can be prepared or raw; normalize + cache prepared geom
+        t0_prep = time.perf_counter()
+        collision_geom = getattr(collision_m, "context", None)
         if collision_geom is None:
-            # assume raw geometry
             collision_geom = collision_m
-        prepared_collision = collision_m
-        # If it's not a prepared geom, prep it
-        try:
-            # prepared geom typically has intersects attribute and no 'geoms' etc; we just attempt a prep safely
-            prepared_collision = _prep(collision_geom)
-        except Exception:
-            # maybe already prepared
-            prepared_collision = collision_m
+
+        key = id(collision_geom)
+        prepared_collision = self._prepared_cache.get(key)
+        if prepared_collision is None:
+            try:
+                prepared_collision = _prep(collision_geom)
+            except Exception:
+                # maybe already prepared
+                prepared_collision = collision_m
+            self._prepared_cache[key] = prepared_collision
+
+        stats.prepare_sec += time.perf_counter() - t0_prep
 
         def _default_edge_ll(u, v, data) -> Tuple[LonLat, LonLat]:
             # Prefer graph node attrs (node_id edition), fallback to parsing lon/lat from node_id.
@@ -498,6 +511,7 @@ class PathRepairer:
         repaired_ll: List[LonLat] = []
 
         if not path_nodes:
+            stats.total_sec = time.perf_counter() - t0_total
             return RepairOutcome(path_nodes=[], path_ll=[], stats=stats, debug=dbg)
 
         # seed first point (node_id-safe)
@@ -577,4 +591,5 @@ class PathRepairer:
             # fall back to original v (even though colliding) so path stays continuous
             repaired_ll.append(ll_v)
 
+        stats.total_sec = time.perf_counter() - t0_total
         return RepairOutcome(path_nodes=repaired_nodes, path_ll=repaired_ll, stats=stats, debug=dbg)
