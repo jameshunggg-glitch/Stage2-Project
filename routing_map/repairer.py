@@ -568,20 +568,15 @@ class PathRepairer:
                 dbg.append(rec)
                 continue
 
-            # ---- rubberband ----
-            rb_xy = _rubberband_patch(u_xy, v_xy, collision_geom, prepared_collision, cfg)
-            if rb_xy is not None:
-                stats.repaired_edges += 1
-                stats.rb_success += 1
-                rec["status"] = "rb_ok"
-                rec["n_pts"] = len(rb_xy)
-
-                for p_xy in rb_xy[1:]:
-                    llp = m2ll((p_xy[0], p_xy[1]))
-                    node = (float(llp[0]), float(llp[1]))
-                    repaired_ll.append(node)
-                dbg.append(rec)
-                continue
+                # ---- rubberband patch (DISABLED) ----
+                # 原本這裡會做 _rubberband_patch()（昂貴，且在運河/窄水道常失敗拖慢）。
+                # 依你的決策：先只保留 fast patch；fast 也失敗就直接走 fallback（保留原 edge）。
+                # rb_xy = _rubberband_patch(u_xy, v_xy, collision_geom, prepared_collision, cfg)
+                # if rb_xy is not None and len(rb_xy) >= 2:
+                #     repaired_edges.append(rb_xy)
+                #     stats.repaired += 1
+                #     stats.rb_success += 1
+                #     continue
 
             # ---- fail ----
             stats.failed_edges += 1

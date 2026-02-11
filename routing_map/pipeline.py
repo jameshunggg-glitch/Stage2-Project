@@ -162,6 +162,12 @@ class RouteResult:
     origin_ll: Optional[LonLat] = None
     dest_ll: Optional[LonLat] = None
 
+    # multiworld (if used)
+    multiworld_combo: Optional[str] = None  # e.g. 'RS'
+    multiworld_rank: Optional[int] = None   # 1=best, 2=runner-up, ...
+    multiworld_alternatives: Optional[List['RouteResult']] = None  # rank>=2 results
+    multiworld_table: Optional[List[Dict[str, Any]]] = None  # lightweight summary for all combos
+
     # snap
     start_ll_snap: Optional[LonLat] = None
     end_ll_snap: Optional[LonLat] = None
@@ -660,8 +666,8 @@ def run_p2p_multiworld(
         )
 
 # --- run each combo and select best by final length ---
-    best: Optional[RouteResult] = None
-    best_len: Optional[float] = None
+    results_ok: List[RouteResult] = []
+    table: List[Dict[str, Any]] = []
 
     for sp, ep in combos:
         combo = f"{sp}{ep}"
@@ -702,21 +708,62 @@ def run_p2p_multiworld(
             run_cfg=run_cfg,
             G_in=G_run,  # reuse built graph (copied)
         )
+        res.multiworld_combo = combo
 
+        final_km: Optional[float] = None
         if res.error is None and res.lengths_km is not None:
-            L = float(res.lengths_km.get("final", 0.0))
+            try:
+                final_km = float(res.lengths_km.get("final", 0.0))
+            except Exception:
+                final_km = None
+
+        table.append(
+            {
+                "combo": combo,
+                "error": res.error,
+                "final_km": final_km,
+                "raw_km": (res.lengths_km or {}).get("raw") if res.lengths_km else None,
+                "repaired_km": (res.lengths_km or {}).get("repaired") if res.lengths_km else None,
+                "simplified_km": (res.lengths_km or {}).get("simplified") if res.lengths_km else None,
+            }
+        )
+
+        if res.error is None and final_km is not None:
             if run_cfg.debug:
-                print(f"[pipeline][multiworld][result] combo={combo} final_km={L}")
-            if best is None or best_len is None or L < best_len:
-                best = res
-                best_len = L
+                print(f"[pipeline][multiworld][result] combo={combo} final_km={final_km}")
+            results_ok.append(res)
         else:
             if run_cfg.debug:
                 print(f"[pipeline][multiworld][result] combo={combo} FAIL: {res.error}")
 
-    if best is None:
-        # all failed: return a representative failure (prefer last)
+    if not results_ok:
         return RouteResult(origin_ll=origin_ll, dest_ll=dest_ll, error="multiworld_all_failed")
+
+    # rank by final length (lower is better)
+    results_ok.sort(key=lambda r: float((r.lengths_km or {}).get("final", 1e30)))
+
+    best = results_ok[0]
+    best.multiworld_rank = 1
+    best.multiworld_table = table
+
+    best_len = float((best.lengths_km or {}).get("final", 1e30))
+
+    # attach runner-up (rank 2) but MUST be different mileage than best
+    EPS_KM = 0.001  # 1m; 如果你想更寬鬆避免浮點誤差，可用 0.05(50m) / 0.1(100m)
+    runner_up = None
+    for cand in results_ok[1:]:
+        cand_len = float((cand.lengths_km or {}).get("final", 1e30))
+        if abs(cand_len - best_len) > EPS_KM:
+            runner_up = cand
+            break
+
+    if runner_up is not None:
+        runner_up.multiworld_rank = 2
+        runner_up.multiworld_table = table
+        best.multiworld_alternatives = [runner_up]
+    else:
+        best.multiworld_alternatives = []
+
 
     # attach a small hint in snap_debug
     if best.snap_debug is None:
@@ -724,8 +771,12 @@ def run_p2p_multiworld(
     best.snap_debug["multiworld_selected"] = True
     best.snap_debug["R_NEAR_COAST_KM"] = R_NEAR
     best.snap_debug["S_MAX_SNAP_KM"] = S_MAX
+    best.snap_debug["multiworld_combo_rank1"] = best.multiworld_combo
+    if best.multiworld_alternatives:
+        best.snap_debug["multiworld_combo_rank2"] = best.multiworld_alternatives[0].multiworld_combo
 
     return best
+
 
 
 __all__ = [

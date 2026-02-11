@@ -37,6 +37,10 @@ lake/**
 aoi_cache/
 aoi_cache/**
 
+# --- batch runs ----
+batch_runs/
+batch_runs/**
+
 # ---- gzipped pickle ----
 *.pkl.gz
 *.pickle.gz
